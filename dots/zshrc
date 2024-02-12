@@ -1,0 +1,165 @@
+# Appends every command to the history file once it is executed
+setopt inc_append_history
+# Reloads the history whenever you use it
+setopt share_history
+
+HISTSIZE=100000
+SAVEHIST=100000
+HISTFILE=~/.zsh_history
+
+# Adapted from code found at <https://gist.github.com/1712320>.
+autoload -Uz promptinit
+promptinit
+setopt prompt_subst
+autoload -U colors && colors # Enable colors in prompt
+
+# Modify the colors and symbols in these variables as desired.
+GIT_PROMPT_PREFIX="%{$fg[green]%}[%{$reset_color%}"
+GIT_PROMPT_SUFFIX="%{$fg[green]%}]%{$reset_color%}"
+GIT_PROMPT_AHEAD="%{$fg[red]%}ANUM%{$reset_color%}"
+GIT_PROMPT_BEHIND="%{$fg[cyan]%}BNUM%{$reset_color%}"
+GIT_PROMPT_MERGING="%{$fg[magenta]%}⚡︎%{$reset_color%}"
+GIT_PROMPT_UNTRACKED="%{$fg[red]%}?%{$reset_color%}"
+GIT_PROMPT_MODIFIED="%{$fg[yellow]%}±%{$reset_color%}"
+GIT_PROMPT_STAGED="%{$fg[green]%}●%{$reset_color%}"
+
+# Show Git branch/tag, or name-rev if on detached head
+parse_git_branch() {
+  (git symbolic-ref -q HEAD || git name-rev --name-only --no-undefined --always HEAD) 2> /dev/null
+}
+
+# Return a 7-character SHA prefix corresponding to HEAD
+parse_git_shorthash() {
+  HEADSHA=$(git rev-parse HEAD 2>/dev/null)
+  if [[ "$HEADSHA" == "HEAD" ]]; then
+    echo ""
+  else
+    echo " ${HEADSHA:0:7}"
+  fi
+}
+
+# Show different symbols as appropriate for various Git repository states
+parse_git_state() {
+
+  # Compose this value via multiple conditional appends.
+  local GIT_STATE=""
+
+  local NUM_AHEAD="$(git log --oneline @{u}.. 2> /dev/null | wc -l | tr -d ' ')"
+  if [ "$NUM_AHEAD" -gt 0 ]; then
+    GIT_STATE=$GIT_STATE${GIT_PROMPT_AHEAD//NUM/$NUM_AHEAD}
+  fi
+
+  local NUM_BEHIND="$(git log --oneline ..@{u} 2> /dev/null | wc -l | tr -d ' ')"
+  if [ "$NUM_BEHIND" -gt 0 ]; then
+    GIT_STATE=$GIT_STATE${GIT_PROMPT_BEHIND//NUM/$NUM_BEHIND}
+  fi
+
+  local GIT_DIR="$(git rev-parse --git-dir 2> /dev/null)"
+  if [ -n $GIT_DIR ] && test -r $GIT_DIR/MERGE_HEAD; then
+    GIT_STATE=$GIT_STATE$GIT_PROMPT_MERGING
+  fi
+
+  if [[ -n $(git ls-files --other --exclude-standard 2> /dev/null) ]]; then
+    GIT_STATE=$GIT_STATE$GIT_PROMPT_UNTRACKED
+  fi
+
+  if ! git diff --quiet 2> /dev/null; then
+    GIT_STATE=$GIT_STATE$GIT_PROMPT_MODIFIED
+  fi
+
+  if ! git diff --cached --quiet 2> /dev/null; then
+    GIT_STATE=$GIT_STATE$GIT_PROMPT_STAGED
+  fi
+
+  if [[ -n $GIT_STATE ]]; then
+    echo "$GIT_STATE "
+  fi
+}
+
+# If inside a Git repository, print its branch and state
+git_prompt_string() {
+  local git_where="$(parse_git_branch)"
+  [ -n "$git_where" ] && echo " ($(parse_git_state)${git_where#(refs/heads/|tags/)}$(parse_git_shorthash))"
+}
+
+hostname_color() {
+  case $(hostname) in
+    teller)
+      echo '%F{cyan}'
+      ;;
+    tanoshii)
+      echo '%F{green}'
+      ;;
+    slug)
+      echo '%F{magenta}'
+      ;;
+    *)
+      echo '%F{white}'
+      ;;
+  esac
+}
+
+PROMPT='%(?..%F{red}[%?] )%f%* %F{210}%n@$(hostname_color)%M%f %B%F{220}%2/%f%b$(git_prompt_string) %# '
+
+bindkey -e
+export NOTIFY_COMMAND_COMPLETE_TIMEOUT=15
+
+# Quick cd tool
+. ~/.sh/z.sh
+
+source ~/.sh/aliases.sh
+source ~/.sh/all.sh
+
+# never ever ever correct me
+unsetopt correct_all
+setopt no_share_history
+
+autoload -U compinit && compinit
+
+zstyle ':completion:*' menu select
+
+if [ -f ~/.sh/fzf.zsh ]; then 
+  source ~/.sh/fzf.zsh
+  source ~/.sh/fzf-tab.zsh
+fi
+
+# export FZF_COMPLETION_TRIGGER=''
+# bindkey '^T' fzf-completion
+# bindkey '^I' $fzf_default_completion
+#
+# rg --files --follow --no-ignore-vcs --hidden -g "!{node_modules/,.git/,__pycache__/,.mypy_cache/,.cache/,venv/,venv3/}"'
+
+export FZF_DEFAULT_COMMAND="rg --files --follow --no-ignore-vcs --hidden -g '!.git/' -g '!.pytest_cache/' -g '!**/.*.egg-info/' -g '!*.pyc' -g '!node_modules/' -g '!__pycache__/' -g '!.mypy_cache/' -g '!.cache/' -g '!venv/'"
+
+[ ! -z "$DESK_ENV" ] && source "$DESK_ENV"
+
+export PYTHONSTARTUP="${HOME}/.config/python/startup.py"
+
+export PATH=${HOME}/.local/bin:${PATH}
+
+# Have zsh report time
+REPORTTIME=3
+
+if [ -d "${HOME}/.cargo/bin" ]; then
+  export PATH="${HOME}/.cargo/bin:${PATH}"
+fi
+
+if [ -d "/usr/local/go/bin" ]; then
+  export PATH="${PATH}:/usr/local/go/bin"
+fi
+
+export BAT_THEME="1337"
+# export BAT_THEME="zenburn"
+export MANPAGER=less
+
+export EDITOR=nvim
+
+# Start tmux unless in an ssh connection.
+#
+# 2024-01-03 Wed 10:32
+# This was causing problems with running vanilla zsh commands (e.g. `getpass`) so 
+# I'm instead doing this as a specific case in the sawy config.
+#
+if [ -z "$TMUX" ] && [ -z "$SSH_CONNECTION" ] && [ -z "$NO_TMUX" ] && [ "$(tty)" != "/dev/tty1" ]; then 
+    # tmux $@
+fi
