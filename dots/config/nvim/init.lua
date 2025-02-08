@@ -2,6 +2,8 @@
 
 vim.cmd('source ~/.vim/common.vim')
 
+vim.g.ackprg = 'rg --vimgrep --smart-case'
+
 -- Bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
@@ -21,17 +23,8 @@ local synlangs = {
 }
 
 require("lazy").setup({
-  { 'nvim-tree/nvim-tree.lua' },
-  {
-    'stevearc/oil.nvim',
-    ---@module 'oil'
-    ---@type oil.SetupOpts
-    opts = {},
-    -- Optional dependencies
-    dependencies = { "nvim-tree/nvim-web-devicons" },
-    -- Lazy loading is not recommended because it is very tricky to make it work correctly in all situations.
-    lazy = false,
-  },
+  { 'preservim/nerdtree' },
+  { 'mileszs/ack.vim' },
   { 'hrsh7th/nvim-cmp', },
   { 'hrsh7th/cmp-buffer', },
   {
@@ -80,14 +73,7 @@ require("lazy").setup({
   },
   { 'folke/which-key.nvim' },
 
-  {
-    "NeogitOrg/neogit",
-    dependencies = {
-      "nvim-lua/plenary.nvim", -- required
-      "sindrets/diffview.nvim", -- optional - Diff integration
-    },
-    config = true
-  },
+  { "tpope/vim-fugitive" },
 
   { 'nomnivore/ollama.nvim' },
   { 'rhysd/vim-clang-format' },
@@ -105,10 +91,16 @@ vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
 vim.opt.termguicolors = true
 
-require("nvim-tree").setup()
-require("oil").setup()
+vim.keymap.set('n', ']', ':NERDTreeToggle<CR>')
 
-vim.keymap.set('n', ']', function() require("nvim-tree.api").tree.toggle() end)
+vim.cmd [[
+  " If another buffer tries to replace NERDTree, put it in the other window, and bring back NERDTree.
+  autocmd BufEnter * if winnr() == winnr('h') && bufname('#') =~ 'NERD_tree_\d\+' && bufname('%') !~ 'NERD_tree_\d\+' && winnr('$') > 1 |
+      \ let buf=bufnr() | buffer# | execute "normal! \<C-W>w" | execute 'buffer'.buf | endif
+
+  " Close the tab if NERDTree is the only window remaining in it.
+  autocmd BufEnter * if winnr('$') == 1 && exists('b:NERDTree') && b:NERDTree.isTabTree() | quit | endif
+]]
 
 -- ~/.config/nvim/lua/finder.lua
 require('finder')
@@ -116,16 +108,7 @@ require('finder')
 -- ~/.config/nvim/lua/completion.lua
 require('completion')
 
--- Auto detect indentation
-vim.api.nvim_create_autocmd("BufReadPost", {
- callback = function()
-   local indent = require("guess-indent").guess_from_buffer()
-   if indent then
-     vim.bo.shiftwidth = indent
-     vim.bo.tabstop = indent
-   end
- end,
-})
+require('guess-indent').setup {}
 
 -- ~/.config/nvim/lua/lsp.lua
 require('lsp')
