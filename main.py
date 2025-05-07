@@ -12,7 +12,10 @@ home: Path = Path.home()
 local_bin = home / ".local/bin"
 hostname = socket.gethostname()
 
-ln = fscm.s.link
+def ln(*args, **kwargs):
+    kwargs.setdefault('sudo', False)
+    return fscm.s.link(*args, **kwargs)
+
 mkdir = fscm.mkdir
 
 def err(*args, **kwargs):

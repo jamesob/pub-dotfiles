@@ -77,3 +77,12 @@ nmap <leader>d i# <C-R>=strftime("%F %a %H:%M")<CR><Esc>
 " strip whitespace
 nnoremap <leader>s :let _s=@/<Bar>:%s/\s\+$//e<Bar>:let @/=_s<Bar><CR>
 autocmd BufWritePre *.py,*.cpp,*.h :%s/\s\+$//e
+
+" Automatically apply these settings whenever editing Go files
+augroup Go
+  autocmd!
+  autocmd FileType go setlocal noexpandtab
+  autocmd FileType go setlocal tabstop=4
+  autocmd FileType go setlocal shiftwidth=4
+  autocmd FileType go setlocal softtabstop=4
+augroup END

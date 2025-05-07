@@ -71,20 +71,29 @@ require("lazy").setup({
       })
     end,
   },
-  { 'folke/which-key.nvim' },
 
   { "tpope/vim-fugitive" },
+  { "tpope/vim-rhubarb" },
 
   { 'nomnivore/ollama.nvim' },
   { 'rhysd/vim-clang-format' },
   { 'NMAC427/guess-indent.nvim' },
+  { 'Vimjas/vim-python-pep8-indent' },
 })
 
 vim.cmd [[colorscheme seoul256]]
 
+vim.api.nvim_create_autocmd("FileType", {
+    pattern = "python",
+    command = "setlocal formatoptions+=cro"
+})
+
 vim.opt.expandtab = true
 vim.opt.shiftwidth = 4
 vim.opt.tabstop = 4
+
+-- continue comments on linebreaks
+vim.cmd([[autocmd FileType * setlocal formatoptions+=cro]])
 
 -- disable netrw at the very start of your init.lua
 vim.g.loaded_netrw = 1
@@ -92,6 +101,15 @@ vim.g.loaded_netrwPlugin = 1
 vim.opt.termguicolors = true
 
 vim.keymap.set('n', ']', ':NERDTreeToggle<CR>')
+
+vim.api.nvim_create_autocmd("FileType", {
+    pattern = "go",
+    callback = function()
+        vim.opt_local.formatoptions:append("ro") -- Continue comments when pressing Enter
+        vim.opt_local.formatoptions:append("t")  -- Auto-wrap comments at textwidth
+        vim.opt_local.textwidth = 87             -- Set max line width for wrapping
+    end,
+})
 
 vim.cmd [[
   " If another buffer tries to replace NERDTree, put it in the other window, and bring back NERDTree.
@@ -101,6 +119,8 @@ vim.cmd [[
   " Close the tab if NERDTree is the only window remaining in it.
   autocmd BufEnter * if winnr('$') == 1 && exists('b:NERDTree') && b:NERDTree.isTabTree() | quit | endif
 ]]
+
+vim.keymap.set('n', ']', function() require("nvim-tree.api").tree.toggle() end)
 
 -- ~/.config/nvim/lua/finder.lua
 require('finder')
@@ -112,17 +132,6 @@ require('guess-indent').setup {}
 
 -- ~/.config/nvim/lua/lsp.lua
 require('lsp')
-
-vim.diagnostic.config({
-  virtual_text = false
-})
-vim.keymap.set('n', '<leader>,', function()
-  vim.diagnostic.config({
-    virtual_text = not vim.diagnostic.config().virtual_text
-  })
-end, opts)
-
-require("which-key").setup{}
 
 -- ~/.config/nvim/lua/keymaps.lua
 require("keymaps")

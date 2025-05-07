@@ -32,6 +32,13 @@ set termguicolors
 
 au BufRead /tmp/mutt-* set tw=72
 
+call plug#begin()
+
+Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
+Plug 'junegunn/fzf.vim'
+
+call plug#end()
+
 " set t_Co=256
 set background=dark
 " colorscheme zengarden

@@ -13,7 +13,7 @@ vim.cmd([[
 
 local opts = { noremap = true, silent = true }
 vim.keymap.set('n', '<leader>t', ':Files<CR>', opts)
-vim.keymap.set('n', '<leader>T', ':Files ~<CR>', opts)
+vim.keymap.set('n', '<leader>T', ':Files ~/src<CR>', opts)
 vim.keymap.set('n', '<leader>ob', ':Files ~/src/bitcoin/<CR>', opts)
 vim.keymap.set('n', '<leader>os', ':Files ~/src/<CR>', opts)
 vim.keymap.set('n', '<leader>.e', ':EditConfig<CR>', opts)

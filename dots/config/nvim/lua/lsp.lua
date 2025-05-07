@@ -3,6 +3,16 @@ local LSP_DEBOUNCE = 400
 -- Setup lspconfig.
 local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
+vim.diagnostic.config({
+  virtual_text = false,
+  underline = false,
+})
+vim.keymap.set('n', '<leader>,', function()
+  vim.diagnostic.config({
+    virtual_text = not vim.diagnostic.config().virtual_text
+  })
+end, opts)
+
 
 lspconfig.clangd.setup{
   capabilities = capabilities,
@@ -45,6 +55,7 @@ lspconfig.pylsp.setup{
   };
 }
 lspconfig.gopls.setup{}
+lspconfig.golangci_lint_ls.setup{}
 
 lspconfig.rust_analyzer.setup{
   capabilities = capabilities,

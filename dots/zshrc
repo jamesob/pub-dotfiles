@@ -1,3 +1,6 @@
+# TO PROFILE
+# zmodload zsh/zprof
+
 # Appends every command to the history file once it is executed
 setopt inc_append_history
 # Reloads the history whenever you use it
@@ -8,10 +11,16 @@ SAVEHIST=100000
 HISTFILE=~/.zsh_history
 
 # Adapted from code found at <https://gist.github.com/1712320>.
-autoload -Uz promptinit
-promptinit
+# autoload -Uz promptinit
+# promptinit
 setopt prompt_subst
 autoload -U colors && colors # Enable colors in prompt
+
+export GPG_TTY="$(tty)"
+export SSH_AUTH_SOCK=$(gpgconf --list-dirs agent-ssh-socket)
+gpgconf --launch gpg-agent
+alias gpgreset='gpg-connect-agent killagent /bye; gpg-connect-agent updatestartuptty /bye; gpg-connect-agent /bye'
+
 
 # Modify the colors and symbols in these variables as desired.
 GIT_PROMPT_PREFIX="%{$fg[green]%}[%{$reset_color%}"
@@ -99,7 +108,7 @@ hostname_color() {
   esac
 }
 
-PROMPT='%(?..%F{red}[%?] )%f%* %F{210}%n@$(hostname_color)%M%f %B%F{220}%2/%f%b$(git_prompt_string) %# '
+PROMPT='%(?..%F{red}[%?] )%f%* %F{blue}%2/%f$(git_prompt_string) %# '
 
 bindkey -e
 export NOTIFY_COMMAND_COMPLETE_TIMEOUT=15
@@ -123,12 +132,6 @@ if [ -f ~/.sh/fzf.zsh ]; then
   source ~/.sh/fzf-tab.zsh
 fi
 
-# export FZF_COMPLETION_TRIGGER=''
-# bindkey '^T' fzf-completion
-# bindkey '^I' $fzf_default_completion
-#
-# rg --files --follow --no-ignore-vcs --hidden -g "!{node_modules/,.git/,__pycache__/,.mypy_cache/,.cache/,venv/,venv3/}"'
-
 export FZF_DEFAULT_COMMAND="rg --files --follow --no-ignore-vcs --hidden -g '!.git/' -g '!.pytest_cache/' -g '!**/.*.egg-info/' -g '!*.pyc' -g '!node_modules/' -g '!__pycache__/' -g '!.mypy_cache/' -g '!.cache/' -g '!venv/'"
 
 [ ! -z "$DESK_ENV" ] && source "$DESK_ENV"
@@ -147,12 +150,22 @@ fi
 if [ -d "/usr/local/go/bin" ]; then
   export PATH="${PATH}:/usr/local/go/bin"
 fi
+if [ -d "${HOME}/go" ]; then
+    export PATH=${HOME}/go/bin:${PATH}
+fi
 
 export BAT_THEME="1337"
 # export BAT_THEME="zenburn"
-export MANPAGER=less
+# export BAT_THEME="ansi"
+export MANPAGER=bat
+
+export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
 
 export EDITOR=nvim
+
+if [ -f "${HOME}/.work.sh" ]; 
+    . ${HOME}/.work.sh
+fi
 
 # Start tmux unless in an ssh connection.
 #
@@ -160,6 +173,23 @@ export EDITOR=nvim
 # This was causing problems with running vanilla zsh commands (e.g. `getpass`) so 
 # I'm instead doing this as a specific case in the sawy config.
 #
-if [ -z "$TMUX" ] && [ -z "$SSH_CONNECTION" ] && [ -z "$NO_TMUX" ] && [ "$(tty)" != "/dev/tty1" ]; then 
-    # tmux $@
+if [ -z "$TMUX" ] && [ -z "$IDEA_INITIAL_DIRECTORY" ] && [ -z "$SSH_CONNECTION" ] && [ -z "$NO_TMUX" ] && [ "$(tty)" != "/dev/tty1" ]; then 
+    tmux $@
 fi
+
+yubikey-fix() {
+    gpg-connect-agent "scd serialno" "learn --force" /bye
+    gpg-connect-agent updatestartuptty /bye
+}
+
+if [ -d ~/.venv ]; then
+    source ~/.venv/bin/activate
+fi
+
+export JDTLS_JVM_ARGS="-javaagent:$HOME/.local/share/eclipse/lombok.jar"
+export JAVA_TOOL_OPTIONS="-Duser.timezone=UTC"
+
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
+
+export PATH=$PATH:/usr/local/go/bin

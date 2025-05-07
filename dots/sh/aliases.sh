@@ -39,7 +39,7 @@ alias .....='cd ../../../..'
 alias ......='echo "Okay, this is just getting ridiculous."'
 
 newb() {
-  git checkout -b "jamesob-$(date +%y-%m-)$1"
+  git checkout -b "jamesob/$1"
 }
 
 gshow() {
@@ -57,9 +57,9 @@ alias gclean='git clean -df .'
 alias gca='git commit -a'
 alias gcam='git commit -am'
 alias grhh='git reset --hard HEAD'
-alias gpush='ggpush'
-alias gpf='ggpush --force-with-lease --tags'
-alias gpull='ggpull'
+alias gpush='git push'
+alias gpf='git push --force-with-lease'
+alias gpull='git pull'
 alias cont='git rebase --continue'
    
 alias gg="git grep"
@@ -219,8 +219,6 @@ count_locks_to_file() {
   cat locks.txt | sort -un
 }
 
-alias nvim='c nvim'
-       
 vi-aliases() {
   vim ~/.sh/aliases.sh
 }
@@ -361,3 +359,5 @@ find-latest-file() {
 
 alias get-latest-file=find-latest-file
 alias dir-last-modified=find-latest-file
+
+alias gotest="gotestsum -f testname"
