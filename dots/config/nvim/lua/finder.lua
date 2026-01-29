@@ -1,4 +1,7 @@
 -- fzf
+
+-- Set FZF to use fd with exclusions
+vim.env.FZF_DEFAULT_COMMAND = 'fd --type f --hidden --follow --exclude .git --exclude .mypy_cache --exclude node_modules --exclude __pycache__ --exclude .pytest_cache --exclude .venv --exclude venv'
 vim.env.FZF_DEFAULT_OPTS = '--bind ctrl-A:select-all'
 
 vim.cmd([[
@@ -13,7 +16,7 @@ vim.cmd([[
 
 local opts = { noremap = true, silent = true }
 vim.keymap.set('n', '<leader>t', ':Files<CR>', opts)
-vim.keymap.set('n', '<leader>T', ':Files ~/src<CR>', opts)
+vim.keymap.set('n', '<leader>T', ':Files ~<CR>', opts)
 vim.keymap.set('n', '<leader>ob', ':Files ~/src/bitcoin/<CR>', opts)
 vim.keymap.set('n', '<leader>os', ':Files ~/src/<CR>', opts)
 vim.keymap.set('n', '<leader>.e', ':EditConfig<CR>', opts)

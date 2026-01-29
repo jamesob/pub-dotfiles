@@ -1,5 +1,6 @@
 set number
 set expandtab
+set noswapfile
 
 " Allow the cursor to move over everything, not just filled space.
 set virtualedit=all

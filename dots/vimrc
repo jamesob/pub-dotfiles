@@ -32,13 +32,6 @@ set termguicolors
 
 au BufRead /tmp/mutt-* set tw=72
 
-call plug#begin()
-
-Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
-Plug 'junegunn/fzf.vim'
-
-call plug#end()
-
 " set t_Co=256
 set background=dark
 " colorscheme zengarden
@@ -61,8 +54,10 @@ hi Visual cterm=NONE ctermfg=black ctermbg=White
 
 " Indentation
 set autoindent
-set sw=4
+set shiftwidth=4
 set tabstop=4
+autocmd FileType python setlocal expandtab shiftwidth=4 tabstop=4
+autocmd FileType markdown setlocal expandtab shiftwidth=2 tabstop=2
 
 " make paragraphs 80col
 nnoremap <leader><Space> gqap
@@ -135,6 +130,7 @@ imap <C-v> <ESC>l<C-V>i
 vmap <C-c> "+y
 set pastetoggle=<leader>pa
 
+" Emacs styleee
 map <Space> ==
 
 set laststatus=2
@@ -278,3 +274,5 @@ function! s:TmuxAwareNavigate(direction)
     let s:tmux_is_last_pane = 0
   endif
 endfunction
+
+

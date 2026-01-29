@@ -8,19 +8,11 @@ cmp.setup({
       luasnip.lsp_expand(args.body)
     end,
   },
-  enabled = function()
-    local disabled = false
-    disabled = disabled or (vim.api.nvim_get_option_value('buftype', { buf = 0 }) == 'prompt')
-    disabled = disabled or (vim.fn.reg_recording() ~= '')
-    disabled = disabled or (vim.fn.reg_executing() ~= '')
-    disabled = disabled or require('cmp.config.context').in_treesitter_capture('comment')
-    return not disabled
-  end,
   mapping = cmp.mapping.preset.insert({
     ['<C-d>'] = cmp.mapping.scroll_docs(-4),
     ['<C-f>'] = cmp.mapping.scroll_docs(4),
     ['<C-Space>'] = cmp.mapping.complete(),
-    ['<C-s>'] = function() cmp.mapping.signature_help() end,
+    -- ['<C-s>'] = function() cmp.mapping.signature_help() end,
     ['<CR>'] = cmp.mapping.confirm {
       behavior = cmp.ConfirmBehavior.Replace,
       select = true,
