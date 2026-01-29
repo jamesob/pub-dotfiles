@@ -1,26 +1,23 @@
-# TO PROFILE
-# zmodload zsh/zprof
-
 # Appends every command to the history file once it is executed
 setopt inc_append_history
 # Reloads the history whenever you use it
 setopt share_history
+
+if [ -f ${HOME}/.local/venv/bin/activate ]; then
+    source ${HOME}/.local/venv/bin/activate
+elif [ -f ${HOME}/.venv/bin/activate ]; then
+    source ${HOME}/.venv/bin/activate
+fi
 
 HISTSIZE=100000
 SAVEHIST=100000
 HISTFILE=~/.zsh_history
 
 # Adapted from code found at <https://gist.github.com/1712320>.
-# autoload -Uz promptinit
-# promptinit
+autoload -Uz promptinit
+promptinit
 setopt prompt_subst
 autoload -U colors && colors # Enable colors in prompt
-
-export GPG_TTY="$(tty)"
-export SSH_AUTH_SOCK=$(gpgconf --list-dirs agent-ssh-socket)
-gpgconf --launch gpg-agent
-alias gpgreset='gpg-connect-agent killagent /bye; gpg-connect-agent updatestartuptty /bye; gpg-connect-agent /bye'
-
 
 # Modify the colors and symbols in these variables as desired.
 GIT_PROMPT_PREFIX="%{$fg[green]%}[%{$reset_color%}"
@@ -108,7 +105,7 @@ hostname_color() {
   esac
 }
 
-PROMPT='%(?..%F{red}[%?] )%f%* %F{blue}%2/%f$(git_prompt_string) %# '
+PROMPT='%(?..%F{red}[%?] )%f%* %F{210}%n@$(hostname_color)%M%f %B%F{220}%2/%f%b$(git_prompt_string) %# '
 
 bindkey -e
 export NOTIFY_COMMAND_COMPLETE_TIMEOUT=15
@@ -116,12 +113,32 @@ export NOTIFY_COMMAND_COMPLETE_TIMEOUT=15
 # Quick cd tool
 . ~/.sh/z.sh
 
+export MARKPATH=$HOME/.marks
+function jump {
+    cd -P "$MARKPATH/$1" 2>/dev/null || echo "No such mark: $1"
+}
+function mark {
+    mkdir -p "$MARKPATH"; ln -s "$(pwd)" "$MARKPATH/$1"
+}
+function unmark {
+    rm -i "$MARKPATH/$1"
+}
+function marks {
+    ls -l "$MARKPATH" | sed 's/  / /g' | cut -d' ' -f9- | sed 's/ -/\t-/g' && echo
+}
+
+function _completemarks {
+  reply=($(ls $MARKPATH))
+}
+
+compctl -K _completemarks jump
+compctl -K _completemarks unmark
+
 source ~/.sh/aliases.sh
 source ~/.sh/all.sh
 
-# never ever ever correct me
 unsetopt correct_all
-setopt no_share_history
+# setopt no_share_history
 
 autoload -U compinit && compinit
 
@@ -138,10 +155,39 @@ export FZF_DEFAULT_COMMAND="rg --files --follow --no-ignore-vcs --hidden -g '!.g
 
 export PYTHONSTARTUP="${HOME}/.config/python/startup.py"
 
+# Spawn an ssh-agent and link it to `~/.ssh/ssh_auth_sock`. This is so
+# we can do things like git pushes from cronjobs and services while unattended.
+#
+# I don't think it represents any compromise in security since these same
+# sockets are living in /tmp anyway, so anyone who is the james user can 
+# make use of any of them...
+#
+# See: https://unix.stackexchange.com/a/217223
+#
+# if [ ! -S ~/.ssh/ssh_auth_sock ]; then
+#   eval `ssh-agent -t $(( 60 * 60 * 24 ))`
+#   ln -sf "$SSH_AUTH_SOCK" ~/.ssh/ssh_auth_sock
+# fi
+# export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock
+# ssh-add -l > /dev/null || ssh-add
+
+export GPG_TTY="$(tty)"
+export SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-$(gpgconf --list-dirs agent-ssh-socket)}
+gpgconf --launch gpg-agent
+
+# Get pass to default to the yubikey
+export PASSWORD_STORE_GPG_OPTS='--default-key 0xC3ED8EEC97AA9D43 '
+
+source ~/.zsh/git.zsh
 export PATH=${HOME}/.local/bin:${PATH}
 
 # Have zsh report time
-REPORTTIME=3
+# REPORTTIME=3
+
+if `which ruby >/dev/null`; then
+  export GEM_HOME="$HOME/.local/gems"
+  export PATH="$HOME/.local/gems/bin:$PATH"
+fi
 
 if [ -d "${HOME}/.cargo/bin" ]; then
   export PATH="${HOME}/.cargo/bin:${PATH}"
@@ -150,22 +196,39 @@ fi
 if [ -d "/usr/local/go/bin" ]; then
   export PATH="${PATH}:/usr/local/go/bin"
 fi
-if [ -d "${HOME}/go" ]; then
-    export PATH=${HOME}/go/bin:${PATH}
-fi
+
+export GDK_BACKEND=wayland
+export QT_QPA_PLATFORM=wayland
+
+export SWAYSOCK=/run/user/$(id -u)/sway-ipc.$(id -u)..sock
 
 export BAT_THEME="1337"
 # export BAT_THEME="zenburn"
-# export BAT_THEME="ansi"
-export MANPAGER=bat
+export MANPAGER=less
 
-export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib
 
-export EDITOR=nvim
+export EDITOR=vim
 
-if [ -f "${HOME}/.work.sh" ]; 
-    . ${HOME}/.work.sh
+if [ "$(tty)" = "/dev/tty1" ] && which sway >/dev/null; then
+    export SDL_VIDEODRIVER=wayland
+    export _JAVA_AWT_WM_NONREPARENTING=1
+    export QT_QPA_PLATFORM=wayland
+    export XDG_CURRENT_DESKTOP=sway
+    export XDG_SESSION_DESKTOP=sway
+    sway
 fi
+
+if [ -d /opt/android-sdk ]; then
+    export ANDROID_HOME='/opt/android-sdk'
+    export PATH=${PATH}:"$ANDROID_HOME/tools/bin/"
+    export PATH=${PATH}:"$ANDROID_HOME/platform-tools/"
+    export PATH=${PATH}:"$ANDROID_HOME/cmdline-tools/latest/bin"
+    export PATH=${PATH}:"$ANDROID_HOME/emulator"
+fi
+
+# Gets `thousands_sep` to work.
+export PYTHONPATH=${HOME}/.ipython/extensions:${PYTHONPATH}
 
 # Start tmux unless in an ssh connection.
 #
@@ -173,23 +236,10 @@ fi
 # This was causing problems with running vanilla zsh commands (e.g. `getpass`) so 
 # I'm instead doing this as a specific case in the sawy config.
 #
-if [ -z "$TMUX" ] && [ -z "$IDEA_INITIAL_DIRECTORY" ] && [ -z "$SSH_CONNECTION" ] && [ -z "$NO_TMUX" ] && [ "$(tty)" != "/dev/tty1" ]; then 
-    tmux $@
+# if [ -z "$TMUX" ] && [ -z "$SSH_CONNECTION" ] && [ -z "$NO_TMUX" ] && [ "$(tty)" != "/dev/tty1" ]; then 
+    # tmux $@
+# fi
+
+if [ -f ~/.zsh/machine-specific.sh ]; then
+    . ~/.zsh/machine-specific.sh
 fi
-
-yubikey-fix() {
-    gpg-connect-agent "scd serialno" "learn --force" /bye
-    gpg-connect-agent updatestartuptty /bye
-}
-
-if [ -d ~/.venv ]; then
-    source ~/.venv/bin/activate
-fi
-
-export JDTLS_JVM_ARGS="-javaagent:$HOME/.local/share/eclipse/lombok.jar"
-export JAVA_TOOL_OPTIONS="-Duser.timezone=UTC"
-
-export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
-export PATH="/opt/homebrew/opt/gnu-sed/libexec/gnubin:$PATH"
-
-export PATH=$PATH:/usr/local/go/bin
