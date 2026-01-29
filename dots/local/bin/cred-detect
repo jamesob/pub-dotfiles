@@ -1,0 +1,461 @@
+#!/usr/bin/env python3
+"""
+Credential Detector - Scans directories for potential secret credentials.
+
+Supports whitelisting via YAML config files:
+  - .cred-detect.yml (local to scanned directory)
+  - ~/.config/cred-detect.yml (user-wide)
+
+Also respects .gitignore files in the scanned directory.
+"""
+
+import argparse
+import os
+import re
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    print("PyYAML not installed. Install with: pip install pyyaml")
+    sys.exit(1)
+
+try:
+    import pathspec
+    HAS_PATHSPEC = True
+except ImportError:
+    HAS_PATHSPEC = False
+
+
+@dataclass
+class Detection:
+    """Represents a detected credential."""
+    file: str
+    line_number: int
+    line_content: str
+    pattern_name: str
+    match: str
+
+
+@dataclass
+class Config:
+    """Configuration for credential detection."""
+    # Patterns to whitelist (won't trigger alerts)
+    whitelist_patterns: list[str] = field(default_factory=list)
+    # File patterns to ignore (globs)
+    ignore_files: list[str] = field(default_factory=list)
+    # Directories to ignore
+    ignore_dirs: list[str] = field(default_factory=list)
+    # File extensions to scan (empty = all text files)
+    extensions: list[str] = field(default_factory=list)
+    # Custom patterns to detect (name: regex)
+    custom_patterns: dict[str, str] = field(default_factory=dict)
+    # Whether to respect .gitignore
+    respect_gitignore: bool = True
+
+
+# Built-in credential patterns
+DEFAULT_PATTERNS = {
+    "AWS Access Key ID": r"(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}",
+    "AWS Secret Key": r"(?i)aws[_\-\.]?secret[_\-\.]?(?:access[_\-\.]?)?key['\"]?\s*[:=]\s*['\"]?([A-Za-z0-9/+=]{40})",
+    "Generic API Key": r"(?i)(?:api[_\-\.]?key|apikey)['\"]?\s*[:=]\s*['\"]?([A-Za-z0-9_\-]{20,})",
+    "Generic Secret": r"(?i)(?:secret|password|passwd|pwd)['\"]?\s*[:=]\s*['\"]?([^\s'\"]{8,})",
+    "GitHub Token": r"(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}",
+    "GitHub OAuth": r"(?i)github[_\-\.]?(?:oauth|token|secret)['\"]?\s*[:=]\s*['\"]?([A-Za-z0-9_\-]{35,})",
+    "Slack Token": r"xox[baprs]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*",
+    "Slack Webhook": r"https://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[A-Za-z0-9]{24}",
+    "Private Key": r"-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----",
+    "Google API Key": r"AIza[0-9A-Za-z\-_]{35}",
+    "Google OAuth": r"[0-9]+-[A-Za-z0-9_]{32}\.apps\.googleusercontent\.com",
+    "Stripe API Key": r"(?:sk|pk)_(?:test|live)_[A-Za-z0-9]{24,}",
+    "Twilio API Key": r"SK[0-9a-fA-F]{32}",
+    "SendGrid API Key": r"SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}",
+    "Mailchimp API Key": r"[0-9a-f]{32}-us[0-9]{1,2}",
+    "JWT Token": r"eyJ[A-Za-z0-9_\-]*\.eyJ[A-Za-z0-9_\-]*\.[A-Za-z0-9_\-]*",
+    "Bearer Token": r"(?i)bearer\s+[A-Za-z0-9_\-\.]+",
+    "Basic Auth": r"(?i)basic\s+[A-Za-z0-9+/=]{20,}",
+    "Database URL": r"(?i)(?:postgres|mysql|mongodb|redis)://[^\s'\"]+:[^\s'\"]+@[^\s'\"]+",
+    "Heroku API Key": r"(?i)heroku[_\-\.]?api[_\-\.]?key['\"]?\s*[:=]\s*['\"]?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+    "NPM Token": r"(?i)//registry\.npmjs\.org/:_authToken=([A-Za-z0-9\-_]+)",
+    "PyPI Token": r"pypi-[A-Za-z0-9_\-]{50,}",
+    "Discord Token": r"(?:mfa\.[A-Za-z0-9_\-]{84}|[A-Za-z0-9_\-]{24}\.[A-Za-z0-9_\-]{6}\.[A-Za-z0-9_\-]{27})",
+    "SSH Private Key Path": r"(?i)(?:identity[_\-]?file|ssh[_\-]?key)['\"]?\s*[:=]\s*['\"]?([~\/][^\s'\"]+)",
+    "Password in URL": r"://[^:]+:([^@]+)@",
+}
+
+# Default files/dirs to ignore
+DEFAULT_IGNORE_DIRS = [
+    ".git", ".hg", ".svn", "node_modules", "__pycache__", 
+    ".venv", "venv", ".tox", ".eggs", "*.egg-info",
+    ".mypy_cache", ".pytest_cache", "dist", "build"
+]
+
+DEFAULT_IGNORE_FILES = [
+    "*.pyc", "*.pyo", "*.so", "*.dylib", "*.dll", "*.exe",
+    "*.jpg", "*.jpeg", "*.png", "*.gif", "*.ico", "*.svg",
+    "*.pdf", "*.zip", "*.tar", "*.gz", "*.bz2",
+    "*.min.js", "*.min.css", "package-lock.json", "yarn.lock",
+    "poetry.lock", "Cargo.lock", "Gemfile.lock"
+]
+
+
+def load_gitignore(directory: Path) -> "pathspec.PathSpec | None":
+    """Load .gitignore patterns from the directory."""
+    if not HAS_PATHSPEC:
+        return None
+    
+    gitignore_path = directory / ".gitignore"
+    if not gitignore_path.exists():
+        return None
+    
+    try:
+        with open(gitignore_path, 'r') as f:
+            patterns = f.read().splitlines()
+        return pathspec.PathSpec.from_lines('gitwildmatch', patterns)
+    except (IOError, OSError) as e:
+        print(f"Warning: Could not read .gitignore: {e}", file=sys.stderr)
+        return None
+
+
+def load_config(directory: Path) -> Config:
+    """Load configuration from local or home config file."""
+    config = Config(
+        ignore_dirs=DEFAULT_IGNORE_DIRS.copy(),
+        ignore_files=DEFAULT_IGNORE_FILES.copy()
+    )
+    
+    # Config file locations (in order of precedence)
+    config_paths = [
+        directory / ".cred-detect.yml",
+        Path.home() / ".config" / "cred-detect.yml"
+    ]
+    
+    for config_path in config_paths:
+        if config_path.exists():
+            print(f"Loading config from: {config_path}")
+            try:
+                with open(config_path) as f:
+                    data = yaml.safe_load(f) or {}
+                
+                if "whitelist_patterns" in data:
+                    config.whitelist_patterns.extend(data["whitelist_patterns"])
+                if "ignore_files" in data:
+                    config.ignore_files.extend(data["ignore_files"])
+                if "ignore_dirs" in data:
+                    config.ignore_dirs.extend(data["ignore_dirs"])
+                if "extensions" in data:
+                    config.extensions = data["extensions"]
+                if "custom_patterns" in data:
+                    config.custom_patterns.update(data["custom_patterns"])
+                if "respect_gitignore" in data:
+                    config.respect_gitignore = data["respect_gitignore"]
+                    
+            except yaml.YAMLError as e:
+                print(f"Warning: Failed to parse {config_path}: {e}", file=sys.stderr)
+    
+    return config
+
+
+def should_ignore_file(filepath: Path, config: Config) -> bool:
+    """Check if a file should be ignored based on config."""
+    import fnmatch
+    
+    filename = filepath.name
+    
+    # Check file patterns
+    for pattern in config.ignore_files:
+        if fnmatch.fnmatch(filename, pattern):
+            return True
+    
+    # Check extensions if specified
+    if config.extensions:
+        if filepath.suffix.lstrip('.') not in config.extensions:
+            return True
+    
+    return False
+
+
+def should_ignore_dir(dirpath: Path, config: Config) -> bool:
+    """Check if a directory should be ignored."""
+    import fnmatch
+    
+    dirname = dirpath.name
+    for pattern in config.ignore_dirs:
+        if fnmatch.fnmatch(dirname, pattern):
+            return True
+    return False
+
+
+def is_whitelisted(line: str, match: str, config: Config) -> bool:
+    """Check if a detection should be whitelisted."""
+    for pattern in config.whitelist_patterns:
+        try:
+            if re.search(pattern, line) or re.search(pattern, match):
+                return True
+        except re.error:
+            # Treat as literal string match if not valid regex
+            if pattern in line or pattern in match:
+                return True
+    return False
+
+
+def is_text_file(filepath: Path) -> bool:
+    """Check if a file appears to be a text file."""
+    try:
+        with open(filepath, 'rb') as f:
+            chunk = f.read(8192)
+            # Check for null bytes (binary indicator)
+            if b'\x00' in chunk:
+                return False
+            return True
+    except (IOError, OSError):
+        return False
+
+
+def scan_file(filepath: Path, patterns: dict[str, str], config: Config) -> list[Detection]:
+    """Scan a single file for credentials."""
+    detections = []
+    
+    if not is_text_file(filepath):
+        return detections
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.rstrip('\n\r')
+                
+                for pattern_name, pattern in patterns.items():
+                    try:
+                        for match in re.finditer(pattern, line):
+                            matched_text = match.group(0)
+                            
+                            # Skip if whitelisted
+                            if is_whitelisted(line, matched_text, config):
+                                continue
+                            
+                            detections.append(Detection(
+                                file=str(filepath),
+                                line_number=line_num,
+                                line_content=line[:200],  # Truncate long lines
+                                pattern_name=pattern_name,
+                                match=matched_text[:100]  # Truncate long matches
+                            ))
+                    except re.error as e:
+                        print(f"Warning: Invalid regex for {pattern_name}: {e}", file=sys.stderr)
+                        
+    except (IOError, OSError) as e:
+        print(f"Warning: Could not read {filepath}: {e}", file=sys.stderr)
+    
+    return detections
+
+
+def scan_directory(directory: Path, config: Config, verbose: bool = False) -> list[Detection]:
+    """Recursively scan a directory for credentials."""
+    all_detections = []
+    
+    # Combine default and custom patterns
+    patterns = DEFAULT_PATTERNS.copy()
+    patterns.update(config.custom_patterns)
+    
+    # Load gitignore if enabled
+    gitignore_spec = None
+    if config.respect_gitignore:
+        gitignore_spec = load_gitignore(directory)
+        if gitignore_spec:
+            print("Respecting .gitignore patterns")
+        elif not HAS_PATHSPEC:
+            print("Note: Install 'pathspec' for .gitignore support: pip install pathspec", 
+                  file=sys.stderr)
+    
+    for root, dirs, files in os.walk(directory):
+        root_path = Path(root)
+        rel_root = root_path.relative_to(directory)
+        
+        # Filter out ignored directories (modifying dirs in-place affects os.walk)
+        dirs[:] = [d for d in dirs if not should_ignore_dir(root_path / d, config)]
+        
+        # Also filter directories based on gitignore
+        if gitignore_spec:
+            dirs[:] = [d for d in dirs 
+                      if not gitignore_spec.match_file(str(rel_root / d) + '/')]
+        
+        for filename in files:
+            filepath = root_path / filename
+            rel_path = filepath.relative_to(directory)
+            
+            # Check gitignore
+            if gitignore_spec and gitignore_spec.match_file(str(rel_path)):
+                if verbose:
+                    print(f"Skipping (gitignore): {filepath}", file=sys.stderr)
+                continue
+            
+            if should_ignore_file(filepath, config):
+                continue
+            
+            if verbose:
+                print(f"Scanning: {filepath}", file=sys.stderr)
+            
+            detections = scan_file(filepath, patterns, config)
+            all_detections.extend(detections)
+    
+    return all_detections
+
+
+def print_detections(detections: list[Detection], show_content: bool = True) -> None:
+    """Print detected credentials."""
+    if not detections:
+        print("\n✅ No credentials detected!")
+        return
+    
+    print(f"\n⚠️  Found {len(detections)} potential credential(s):\n")
+    print("=" * 80)
+    
+    # Group by file
+    by_file: dict[str, list[Detection]] = {}
+    for d in detections:
+        by_file.setdefault(d.file, []).append(d)
+    
+    for filepath, file_detections in by_file.items():
+        print(f"\n📄 {filepath}")
+        print("-" * 40)
+        
+        for d in file_detections:
+            print(f"  Line {d.line_number}: [{d.pattern_name}]")
+            if show_content:
+                # Mask the actual credential in output
+                masked_line = d.line_content
+                if d.match and len(d.match) > 4:
+                    visible = d.match[:4]
+                    masked = visible + "*" * (len(d.match) - 4)
+                    masked_line = masked_line.replace(d.match, masked)
+                print(f"    {masked_line}")
+            print()
+    
+    print("=" * 80)
+
+
+def generate_sample_config() -> str:
+    """Generate a sample configuration file."""
+    return """# Credential Detector Configuration
+# Place this file at .cred-detect.yml (local) or ~/.config/cred-detect.yml (global)
+
+# Patterns to whitelist (regex or literal strings)
+# Matches against both the full line and the detected credential
+whitelist_patterns:
+  - "example\\.com"
+  - "placeholder"
+  - "your-api-key-here"
+  - "REPLACE_ME"
+  - "xxxx"
+  - "test_?key"
+  - "dummy"
+  - "fake"
+
+# Additional file patterns to ignore (globs)
+ignore_files:
+  - "*.test.js"
+  - "*.spec.py"
+  - "test_*.py"
+  - "*.example"
+  - "*.sample"
+
+# Additional directories to ignore
+ignore_dirs:
+  - "test"
+  - "tests"
+  - "fixtures"
+  - "mocks"
+
+# Whether to respect .gitignore files (requires 'pathspec' package)
+respect_gitignore: true
+
+# Only scan files with these extensions (empty = all text files)
+# extensions:
+#   - py
+#   - js
+#   - ts
+#   - json
+#   - yml
+#   - yaml
+#   - env
+#   - ini
+#   - conf
+#   - cfg
+
+# Custom patterns to detect (name: regex)
+custom_patterns:
+  # Add your own patterns here
+  # "My Custom Token": "[A-Z]{5}-[0-9]{5}-[A-Z]{5}"
+"""
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Scan directories for potential credential leaks",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s .                    # Scan current directory
+  %(prog)s /path/to/project     # Scan specific directory
+  %(prog)s . --verbose          # Scan with verbose output
+  %(prog)s . --no-content       # Don't show line content
+  %(prog)s . --no-gitignore     # Don't respect .gitignore
+  %(prog)s --generate-config    # Print sample config file
+        """
+    )
+    
+    parser.add_argument("directory", nargs="?", default=".", 
+                        help="Directory to scan (default: current directory)")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Show files being scanned")
+    parser.add_argument("--no-content", action="store_true",
+                        help="Don't show line content in output")
+    parser.add_argument("--no-gitignore", action="store_true",
+                        help="Don't respect .gitignore patterns")
+    parser.add_argument("--generate-config", action="store_true",
+                        help="Print a sample configuration file and exit")
+    parser.add_argument("--list-patterns", action="store_true",
+                        help="List built-in detection patterns and exit")
+    
+    args = parser.parse_args()
+    
+    if args.generate_config:
+        print(generate_sample_config())
+        return 0
+    
+    if args.list_patterns:
+        print("Built-in credential patterns:\n")
+        for name, pattern in sorted(DEFAULT_PATTERNS.items()):
+            print(f"  {name}:")
+            print(f"    {pattern}\n")
+        return 0
+    
+    directory = Path(args.directory).resolve()
+    
+    if not directory.exists():
+        print(f"Error: Directory not found: {directory}", file=sys.stderr)
+        return 1
+    
+    if not directory.is_dir():
+        print(f"Error: Not a directory: {directory}", file=sys.stderr)
+        return 1
+    
+    print(f"🔍 Scanning: {directory}\n")
+    
+    config = load_config(directory)
+    
+    # Override gitignore setting from CLI
+    if args.no_gitignore:
+        config.respect_gitignore = False
+    
+    detections = scan_directory(directory, config, verbose=args.verbose)
+    print_detections(detections, show_content=not args.no_content)
+    
+    # Return non-zero exit code if credentials found
+    return 1 if detections else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
