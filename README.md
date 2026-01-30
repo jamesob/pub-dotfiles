@@ -16,3 +16,4 @@ Much of this was written before the LLM days, but some of it wasn't.
 - [`pypass`](dots/local/bin/pypass): Passphrase generator with BIP32 mnemonic, word-list, and symbol/number modes
 - [`cred-detect`](dots/local/bin/cred-detect): Scans directories for hardcoded secrets (AWS keys, tokens, JWTs, etc.) with whitelisting support
 - [`mon-ctrl`](hosts/fido/local/bin/mon-ctrl): DDC-CI monitor brightness and input control with time-of-day auto-adjust
+- [`media-touchpad.py`](dots/local/bin/media-touchpad.py): An interface I run on a cheap Chinese touchpad to manage audio and switch output speakers quickly
