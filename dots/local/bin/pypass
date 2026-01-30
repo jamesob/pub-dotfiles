@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+import argparse
+import math
+import random
+import re
+import secrets
+import subprocess
+import sys
+from pathlib import Path
+
+
+def _get_words(min_length=5):
+    out = []
+    p = re.compile(r"[^a-z]")
+    for word in Path('/usr/share/dict/words').read_text().splitlines():
+        if p.search(word) or len(word) < min_length:
+            continue
+        out.append(word)
+
+    if len(out) < 4096:
+        raise RuntimeError(f"something is wrong; wordlist too short (len={len(out)})")
+
+    return out
+
+
+def genwords(args):
+    """Generate the file of allowable words."""
+    for word in _get_words(args.min_length):
+        print(word)
+
+
+def gen(args):
+    """Generate a password."""
+    delim = args.delim or '.'
+    num_words = args.num_words
+    wordlist = _get_words()
+    assert len(wordlist) > 50_000
+    newpass = None
+    tries = 0
+    while not newpass:
+        sym = random.choice('!*&@$')
+        words = [secrets.choice(wordlist) for _ in range(num_words)]
+        words.append(str(random.randint(0, 100)))
+        candidate = delim.join(words).capitalize() + sym
+        if args.max_len and len(candidate) > args.max_len:
+            tries += 1
+            if tries % 1000 == 0:
+                print(f"reducing words to {num_words}", file=sys.stderr)
+                num_words -= 1
+            continue
+        newpass = candidate
+    if subprocess.run('which wl-copy', capture_output=True, shell=True).returncode == 0:
+        subprocess.run('wl-copy', input=newpass.encode(), shell=True)
+    print(newpass)
+
+
+def bip32(args):
+    """Generate a BIP32-style mnemonic with target bits of security."""
+    wordlist = _get_words()
+    bits_per_word = math.log2(len(wordlist))
+    num_words = math.ceil(args.nbits / bits_per_word)
+    words = [secrets.choice(wordlist) for _ in range(num_words)]
+    print(" ".join(words))
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest='command')
+
+    genwords_parser = subparsers.add_parser('genwords', help='Generate the file of allowable words.')
+    genwords_parser.add_argument('--min-length', type=int, default=5)
+    genwords_parser.set_defaults(func=genwords)
+
+    gen_parser = subparsers.add_parser('gen', help='Generate a password.')
+    gen_parser.add_argument('-n', '--num-words', type=int, default=3)
+    gen_parser.add_argument('-m', '--max-len', type=int, default=0)
+    gen_parser.add_argument('-d', '--delim', type=str, default=None)
+    gen_parser.set_defaults(func=gen)
+
+    bip32_parser = subparsers.add_parser(
+        'bip32', help='Generate mnemonic with target bits.'
+    )
+    bip32_parser.add_argument('nbits', type=int, nargs='?', default=256)
+    bip32_parser.set_defaults(func=bip32)
+
+    args = parser.parse_args()
+    if hasattr(args, 'func'):
+        args.func(args)
+    else:
+        parser.print_help()
