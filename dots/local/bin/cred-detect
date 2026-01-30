@@ -163,6 +163,10 @@ def should_ignore_file(filepath: Path, config: Config) -> bool:
     import fnmatch
     
     filename = filepath.name
+
+    # Ignore this file (since it has content that will trigger)
+    if filepath.resolve() == Path(__file__).resolve():
+        return True
     
     # Check file patterns
     for pattern in config.ignore_files:

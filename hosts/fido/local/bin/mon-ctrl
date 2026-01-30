@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Monitor name to bus mapping
+declare -A MONITORS=(
+    ["z3"]="2"
+    ["s27"]="3"
+    ["p27"]="4"
+)
+
+# VCP codes
+VCP_BRIGHTNESS=0x10
+VCP_INPUT_SOURCE=0x60
+
+# Input source values (common for Dell)
+INPUT_HDMI1=0x11
+INPUT_HDMI2=0x12
+
+get_bus() {
+    local name="${1,,}"  # lowercase
+    if [[ -v "MONITORS[$name]" ]]; then
+        echo "${MONITORS[$name]}"
+    else
+        echo "Unknown monitor: $1" >&2
+        echo "Available: ${!MONITORS[*]}" >&2
+        return 1
+    fi
+}
+
+cmd_brightness() {
+    local monitor="$1"
+    local value="$2"
+    local bus
+    bus=$(get_bus "$monitor")
+    ddcutil --bus="$bus" setvcp "$VCP_BRIGHTNESS" "$value"
+    echo "Set $monitor brightness to $value"
+}
+
+cmd_switch() {
+    local bus
+    bus=$(get_bus "s27")
+    
+    # Get current input
+    local current
+    current=$(ddcutil --bus="$bus" getvcp "$VCP_INPUT_SOURCE" 2>/dev/null | grep -oP 'sl=0x\K[0-9a-f]+')
+    
+    if [[ "$current" == "11" ]]; then
+        ddcutil --bus="$bus" setvcp "$VCP_INPUT_SOURCE" "$INPUT_HDMI2"
+        echo "Switched S27 to HDMI2"
+    else
+        ddcutil --bus="$bus" setvcp "$VCP_INPUT_SOURCE" "$INPUT_HDMI1"
+        echo "Switched S27 to HDMI1"
+    fi
+}
+
+cmd_show() {
+    for name in "${!MONITORS[@]}"; do
+        local bus="${MONITORS[$name]}"
+        local brightness
+        brightness=$(ddcutil --bus="$bus" getvcp "$VCP_BRIGHTNESS" 2>/dev/null | grep -oP 'current value =\s*\K\d+' || echo "??")
+        printf "%-6s (bus %s): brightness %s\n" "$name" "$bus" "$brightness"
+    done
+}
+
+cmd_adjust_for_time() {
+    local brightness
+    
+    if command -v gammastep &>/dev/null && pgrep -x gammastep &>/dev/null; then
+        local period
+        period=$(gammastep -p 2>/dev/null | grep -oP 'Period:\s*\K\w+' || echo "unknown")
+        if [[ "$period" == "Daytime" ]]; then
+            brightness=80
+        else
+            brightness=1
+        fi
+        echo "Gammastep period: $period"
+    else
+        local hour
+        hour=$(date +%H)
+        if (( hour >= 20 || hour < 7 )); then
+            brightness=1
+        else
+            brightness=80
+        fi
+        echo "Time-based (hour $hour)"
+    fi
+    
+    echo "Setting all monitors to brightness $brightness"
+    for name in "${!MONITORS[@]}"; do
+        cmd_brightness "$name" "$brightness"
+    done
+}
+
+usage() {
+    cat <<EOF
+Usage: mon-ctl <command> [args]
+
+Commands:
+    brightness <monitor> <0-100>  Set monitor brightness
+    switch                        Toggle S27 between HDMI1/HDMI2
+    show                          Display all monitors
+    adjust-for-time               Auto-adjust brightness based on time/gammastep
+
+Monitors: ${!MONITORS[*]}
+EOF
+}
+
+case "${1:-}" in
+    brightness)
+        [[ $# -lt 3 ]] && { usage; exit 1; }
+        cmd_brightness "$2" "$3"
+        ;;
+    switch)
+        cmd_switch
+        ;;
+    show)
+        cmd_show
+        ;;
+    adjust-for-time)
+        cmd_adjust_for_time
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

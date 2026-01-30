@@ -178,7 +178,6 @@ gpgconf --launch gpg-agent
 # Get pass to default to the yubikey
 export PASSWORD_STORE_GPG_OPTS='--default-key 0xC3ED8EEC97AA9D43 '
 
-source ~/.zsh/git.zsh
 export PATH=${HOME}/.local/bin:${PATH}
 
 # Have zsh report time
