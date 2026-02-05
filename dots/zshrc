@@ -1,17 +1,17 @@
 # Appends every command to the history file once it is executed
-setopt inc_append_history
+setopt INC_APPEND_HISTORY
 # Reloads the history whenever you use it
-setopt share_history
+setopt EXTENDED_HISTORY
+
+HISTSIZE=100000
+SAVEHIST=100000
+HISTFILE=~/.zsh_history
 
 if [ -f ${HOME}/.local/venv/bin/activate ]; then
     source ${HOME}/.local/venv/bin/activate
 elif [ -f ${HOME}/.venv/bin/activate ]; then
     source ${HOME}/.venv/bin/activate
 fi
-
-HISTSIZE=100000
-SAVEHIST=100000
-HISTFILE=~/.zsh_history
 
 # Adapted from code found at <https://gist.github.com/1712320>.
 autoload -Uz promptinit

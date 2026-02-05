@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Monitor name to bus mapping
 declare -A MONITORS=(
-    ["z3"]="2"
-    ["s27"]="3"
-    ["p27"]="4"
+    ["touch"]="2"
+    ["main"]="3"
+    ["sec"]="4"
 )
 
 # VCP codes
@@ -38,7 +38,7 @@ cmd_brightness() {
 
 cmd_switch() {
     local bus
-    bus=$(get_bus "s27")
+    bus=$(get_bus "main")
     
     # Get current input
     local current
@@ -46,10 +46,10 @@ cmd_switch() {
     
     if [[ "$current" == "11" ]]; then
         ddcutil --bus="$bus" setvcp "$VCP_INPUT_SOURCE" "$INPUT_HDMI2"
-        echo "Switched S27 to HDMI2"
+        echo "Switched main to HDMI2"
     else
         ddcutil --bus="$bus" setvcp "$VCP_INPUT_SOURCE" "$INPUT_HDMI1"
-        echo "Switched S27 to HDMI1"
+        echo "Switched main to HDMI1"
     fi
 }
 
@@ -67,9 +67,9 @@ cmd_adjust_for_time() {
     
     if command -v gammastep &>/dev/null && pgrep -x gammastep &>/dev/null; then
         local period
-        period=$(gammastep -p 2>/dev/null | grep -oP 'Period:\s*\K\w+' || echo "unknown")
+        period=$(gammastep -p 2>&1 | grep -oP 'Period:\s*\K\w+' || echo 'unknown')
         if [[ "$period" == "Daytime" ]]; then
-            brightness=80
+            brightness=100
         else
             brightness=1
         fi
@@ -80,7 +80,7 @@ cmd_adjust_for_time() {
         if (( hour >= 20 || hour < 7 )); then
             brightness=1
         else
-            brightness=80
+            brightness=100
         fi
         echo "Time-based (hour $hour)"
     fi
@@ -97,16 +97,16 @@ Usage: mon-ctl <command> [args]
 
 Commands:
     brightness <monitor> <0-100>  Set monitor brightness
-    switch                        Toggle S27 between HDMI1/HDMI2
+    switch                        Toggle main between HDMI1/HDMI2
     show                          Display all monitors
-    adjust-for-time               Auto-adjust brightness based on time/gammastep
+    time                          Auto-adjust brightness based on time/gammastep
 
 Monitors: ${!MONITORS[*]}
 EOF
 }
 
 case "${1:-}" in
-    brightness)
+    b|brightness)
         [[ $# -lt 3 ]] && { usage; exit 1; }
         cmd_brightness "$2" "$3"
         ;;
@@ -116,7 +116,7 @@ case "${1:-}" in
     show)
         cmd_show
         ;;
-    adjust-for-time)
+    time)
         cmd_adjust_for_time
         ;;
     *)

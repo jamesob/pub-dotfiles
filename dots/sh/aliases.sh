@@ -361,3 +361,16 @@ alias get-latest-file=find-latest-file
 alias dir-last-modified=find-latest-file
 
 alias gotest="gotestsum -f testname"
+
+# Sometimes, gpg-agent hangs with yubikey; unfuck with
+function gpg-unfuck() {
+  gpgconf --kill gpg-agent
+  gpg-connect-agent updatestartuptty /bye
+}
+
+# When using multiple yubikeys that contain the same subkeys, it is necessary to
+# run this when interchanging devices.
+yubikey-learnkeys() {
+  gpg-unfuck
+  gpg-connect-agent "scd serialno" "learn --force" /bye
+}
