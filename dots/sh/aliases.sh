@@ -1,5 +1,6 @@
 #!/bin/bash
 
+alias sysu='systemctl --user'
 alias tmuxls='tmux list-sessions'
 alias tmuxgo='tmux attach-session -t'
 alias tmuxnew='tmux new-session -s'

@@ -155,26 +155,6 @@ export FZF_DEFAULT_COMMAND="rg --files --follow --no-ignore-vcs --hidden -g '!.g
 
 export PYTHONSTARTUP="${HOME}/.config/python/startup.py"
 
-# Spawn an ssh-agent and link it to `~/.ssh/ssh_auth_sock`. This is so
-# we can do things like git pushes from cronjobs and services while unattended.
-#
-# I don't think it represents any compromise in security since these same
-# sockets are living in /tmp anyway, so anyone who is the james user can 
-# make use of any of them...
-#
-# See: https://unix.stackexchange.com/a/217223
-#
-# if [ ! -S ~/.ssh/ssh_auth_sock ]; then
-#   eval `ssh-agent -t $(( 60 * 60 * 24 ))`
-#   ln -sf "$SSH_AUTH_SOCK" ~/.ssh/ssh_auth_sock
-# fi
-# export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock
-# ssh-add -l > /dev/null || ssh-add
-
-export GPG_TTY="$(tty)"
-export SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-$(gpgconf --list-dirs agent-ssh-socket)}
-gpgconf --launch gpg-agent
-
 # Get pass to default to the yubikey
 export PASSWORD_STORE_GPG_OPTS='--default-key 0xC3ED8EEC97AA9D43 '
 
@@ -238,6 +218,31 @@ export PYTHONPATH=${HOME}/.ipython/extensions:${PYTHONPATH}
 # if [ -z "$TMUX" ] && [ -z "$SSH_CONNECTION" ] && [ -z "$NO_TMUX" ] && [ "$(tty)" != "/dev/tty1" ]; then 
     # tmux $@
 # fi
+
+# Spawn an ssh-agent and link it to `~/.ssh/ssh_auth_sock`. This is so
+# we can do things like git pushes from cronjobs and services while unattended.
+#
+# I don't think it represents any compromise in security since these same
+# sockets are living in /tmp anyway, so anyone who is the james user can 
+# make use of any of them...
+#
+# See: https://unix.stackexchange.com/a/217223
+#
+# if [ ! -S ~/.ssh/ssh_auth_sock ]; then
+#   eval `ssh-agent -t $(( 60 * 60 * 24 ))`
+#   ln -sf "$SSH_AUTH_SOCK" ~/.ssh/ssh_auth_sock
+# fi
+# export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock
+# ssh-add -l > /dev/null || ssh-add
+
+export GPG_TTY="$(tty)"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    export SSH_AUTH_SOCK=$(gpgconf --list-dirs agent-ssh-socket)
+else
+    export SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-$(gpgconf --list-dirs agent-ssh-socket)}
+fi
+gpgconf --launch gpg-agent
+gpg-connect-agent updatestartuptty /bye > /dev/null
 
 if [ -f ~/.zsh/machine-specific.sh ]; then
     . ~/.zsh/machine-specific.sh
