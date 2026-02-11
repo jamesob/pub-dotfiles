@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -z "${1:-}" ]; then 
+    echo "Usage: <dots-repo-location>"
+    exit 1
+fi
+
+SCRIPT_DIR="$(cd "$(realpath "$1")" && pwd)"
 DOTS_DIR="${DOTS_DIR:-$SCRIPT_DIR/dots}"
 HOSTS_DIR="${HOSTS_DIR:-$SCRIPT_DIR/hosts}"
 TARGET_DIR="${TARGET_DIR:-$HOME}"
