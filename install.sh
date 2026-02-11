@@ -12,20 +12,6 @@ if [[ ! -d "$DOTS_DIR" ]]; then
     exit 1
 fi
 
-if ! command -v fzf &>/dev/null; then
-    echo "Installing fzf..."
-    if [[ "$OSTYPE" == darwin* ]]; then
-        brew install fzf
-    elif command -v pacman &>/dev/null; then
-        sudo pacman -S --noconfirm fzf
-    elif command -v apt-get &>/dev/null; then
-        sudo apt-get update && sudo apt-get install -y fzf
-    else
-        echo "Unknown OS, install fzf manually" >&2
-        exit 1
-    fi
-fi
-
 laank() {
     local src=$1
     local base_dir=$2
@@ -104,3 +90,32 @@ enable_systemd_units() {
 
 enable_systemd_units "$DOTS_DIR"
 [[ -d "$HOST_DIR" ]] && enable_systemd_units "$HOST_DIR"
+
+# Package installation
+if [[ "$OSTYPE" == darwin* ]]; then
+    if ! command -v brew &>/dev/null; then
+        echo "Installing Homebrew..."
+        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL \
+            https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
+    export HOMEBREW_NO_AUTO_UPDATE=1
+    brew install vim tmux fzf pass nmap go ripgrep fd tree \
+        htop ffmpeg git-delta syncthing
+    brew install --head neovim
+    brew install --cask vlc ghostty
+    # Key repeat: lower = faster. UI minimums are 15/2.
+    defaults write NSGlobalDomain InitialKeyRepeat -int 13
+    befaults write NSGlobalDomain KeyRepeat -int 1
+elif command -v pacman &>/dev/null; then
+    sudo pacman -S --noconfirm --needed vim tmux fzf pass \
+        vlc neovim nmap go ripgrep fd tree htop ffmpeg \
+        git-delta
+elif command -v apt-get &>/dev/null; then
+    sudo apt-get update
+    sudo apt-get install -y vim tmux fzf pass vlc neovim \
+        nmap golang ripgrep fd-find tree htop ffmpeg \
+        git-delta
+else
+    echo "Unknown platform, install packages manually" >&2
+    exit 1
+fi

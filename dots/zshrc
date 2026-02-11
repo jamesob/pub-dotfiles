@@ -7,6 +7,8 @@ HISTSIZE=100000
 SAVEHIST=100000
 HISTFILE=~/.zsh_history
 
+export TERM=xterm-256color
+
 if [ -f ${HOME}/.local/venv/bin/activate ]; then
     source ${HOME}/.local/venv/bin/activate
 elif [ -f ${HOME}/.venv/bin/activate ]; then
