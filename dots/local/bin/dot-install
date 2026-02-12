@@ -98,6 +98,7 @@ enable_systemd_units "$DOTS_DIR"
 
 # Package installation
 if [[ "$OSTYPE" == darwin* ]]; then
+
     if ! command -v brew &>/dev/null; then
         echo "Installing Homebrew..."
         NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL \
@@ -107,19 +108,24 @@ if [[ "$OSTYPE" == darwin* ]]; then
     brew install vim tmux fzf pass nmap go ripgrep fd tree \
         htop ffmpeg git-delta syncthing
     brew install --head neovim
-    brew install --cask vlc ghostty
+    brew install --cask vlc ghostty flux signal thunderbird
     # Key repeat: lower = faster. UI minimums are 15/2.
-    defaults write NSGlobalDomain InitialKeyRepeat -int 13
-    befaults write NSGlobalDomain KeyRepeat -int 1
+    defaults write -g InitialKeyRepeat -int 13
+    defaults write -g KeyRepeat -int 1
+
 elif command -v pacman &>/dev/null; then
+
     sudo pacman -S --noconfirm --needed vim tmux fzf pass \
         vlc neovim nmap go ripgrep fd tree htop ffmpeg \
         git-delta
+
 elif command -v apt-get &>/dev/null; then
+
     sudo apt-get update
     sudo apt-get install -y vim tmux fzf pass vlc neovim \
         nmap golang ripgrep fd-find tree htop ffmpeg \
         git-delta
+
 else
     echo "Unknown platform, install packages manually" >&2
     exit 1
