@@ -64,14 +64,19 @@ cmd_show() {
 
 cmd_adjust_for_time() {
     local brightness
+    local isday
     
     if command -v gammastep &>/dev/null && pgrep -x gammastep &>/dev/null; then
         local period
         period=$(gammastep -p 2>&1 | grep -oP 'Period:\s*\K\w+' || echo 'unknown')
         if [[ "$period" == "Daytime" ]]; then
             brightness=100
+            echo "Stopping gammastep"
+            systemctl --user stop gammastep || true
         else
             brightness=1
+            echo "Starting gammastep"
+            systemctl --user start gammastep || true
         fi
         echo "Gammastep period: $period"
     else
@@ -79,8 +84,12 @@ cmd_adjust_for_time() {
         hour=$(date +%H)
         if (( hour >= 20 || hour < 7 )); then
             brightness=1
+            echo "Starting gammastep"
+            systemctl --user start gammastep || true
         else
             brightness=100
+            echo "Stopping gammastep"
+            systemctl --user stop gammastep || true
         fi
         echo "Time-based (hour $hour)"
     fi
