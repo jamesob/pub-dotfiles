@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+"""sysinfo — hardware capability overview. Run as root for full detail."""
+
+import subprocess, os, re, socket, platform
+
+# ── ANSI ─────────────────────────────────────────────────────────────────────
+RST = "\033[0m";  B = "\033[1m";  DIM = "\033[2m"
+CY  = "\033[36m"; GR = "\033[32m"; YL = "\033[33m"
+RD  = "\033[31m"; MG = "\033[35m"; BL = "\033[34m"; WH = "\033[97m"
+
+W = 76
+
+def run(cmd):
+    try:
+        return subprocess.check_output(cmd, shell=True, stderr=subprocess.DEVNULL, text=True).strip()
+    except Exception:
+        return ""
+
+def heading(title):
+    print(f"\n  {CY}{title}{RST} {DIM}{'─' * (W - len(title) - 3)}{RST}")
+
+def row(c1, rest, w=20):
+    print(f"    {CY}{c1:<{w}}{RST} {rest}")
+
+def human(b):
+    for u in ("B","KB","MB","GB","TB","PB"):
+        if abs(b) < 1024: return f"{b:.1f} {u}"
+        b /= 1024
+    return f"{b:.1f} EB"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HEADER
+# ═══════════════════════════════════════════════════════════════════════════════
+hostname = socket.gethostname()
+kernel   = platform.release()
+board    = run("cat /sys/devices/virtual/dmi/id/board_name") or "?"
+vendor   = run("cat /sys/devices/virtual/dmi/id/board_vendor") or ""
+bios_v   = run("cat /sys/devices/virtual/dmi/id/bios_version") or "?"
+bios_d   = run("cat /sys/devices/virtual/dmi/id/bios_date") or ""
+chassis  = run("cat /sys/devices/virtual/dmi/id/chassis_type")
+chassis_map = {"3":"Desktop","6":"Mini Tower","7":"Tower","8":"Portable",
+               "9":"Laptop","10":"Notebook","13":"All-in-One","17":"Server",
+               "23":"Rack Mount"}
+chassis_str = chassis_map.get(chassis, "")
+
+print()
+print(f"  {DIM}{'═' * W}{RST}")
+print(f"  {B}{WH}{hostname}{RST}  {DIM}{vendor} {board}  |  BIOS {bios_v} ({bios_d})"
+      + (f"  |  {chassis_str}" if chassis_str else "") + f"{RST}")
+print(f"  {DIM}kernel {kernel}{RST}")
+print(f"  {DIM}{'═' * W}{RST}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CPU
+# ═══════════════════════════════════════════════════════════════════════════════
+heading("CPU")
+
+cpuinfo = run("cat /proc/cpuinfo")
+model, phys_ids, threads = "", set(), 0
+for line in cpuinfo.splitlines():
+    if line.startswith("model name") and not model:
+        model = re.sub(r"\s+", " ", line.split(":", 1)[1].strip())
+    if line.startswith("physical id"):
+        phys_ids.add(line.split(":")[1].strip())
+    if line.startswith("processor"):
+        threads += 1
+
+sockets = len(phys_ids) or 1
+cores = run("lscpu | grep '^Core(s) per socket'")
+cores = int(cores.split(":")[1]) if cores else "?"
+cache = run("lscpu | grep 'L3 cache'")
+cache = cache.split(":")[1].strip() if cache else ""
+freq = run("lscpu | grep 'CPU max MHz'")
+freq = f"{float(freq.split(':')[1]):.0f} MHz" if freq and ":" in freq else ""
+
+tpc = threads // max(sockets * (cores if isinstance(cores, int) else 1), 1)
+print(f"    {WH}{model}{RST}")
+print(f"    {DIM}{sockets}S / {cores}C / {tpc}T per core = {WH}{threads} threads{RST}"
+      f"    {DIM}max {freq}" + (f"    L3 {cache}" if cache else "") + f"{RST}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MEMORY
+# ═══════════════════════════════════════════════════════════════════════════════
+heading("MEMORY")
+
+dmi = run("sudo dmidecode -t memory 2>/dev/null") or run("dmidecode -t memory 2>/dev/null")
+slots = []
+cur = None
+for line in dmi.splitlines():
+    if line.strip() == "Memory Device":
+        if cur: slots.append(cur)
+        cur = {}
+    elif cur is not None and ":" in line:
+        k, v = line.split(":", 1)
+        k, v = k.strip(), v.strip()
+        if k == "Locator" and "Bank" not in line:
+            cur["Locator"] = v
+        elif k in ("Size","Type","Speed","Manufacturer","Part Number","Configured Memory Speed"):
+            cur[k] = v
+if cur: slots.append(cur)
+slots = [s for s in slots if s.get("Locator")]
+
+phys_mem = run("sudo dmidecode -t 16 2>/dev/null") or run("dmidecode -t 16 2>/dev/null")
+max_cap = ""
+for line in phys_mem.splitlines():
+    if "Maximum Capacity" in line:
+        max_cap = line.split(":")[1].strip(); break
+
+pop, total_gb = 0, 0
+for s in slots:
+    loc = s.get("Locator", "?")
+    sz  = s.get("Size", "?")
+    short = loc.replace("Controller","C").replace("Channel","Ch").replace("-DIMM","D").replace("DIMM_","")
+    filled = "No Module" not in sz and "Not Installed" not in sz
+
+    if filled:
+        pop += 1
+        typ  = s.get("Type", "?")
+        spd  = s.get("Configured Memory Speed", s.get("Speed", "?"))
+        mfr  = s.get("Manufacturer", "?")
+        part = s.get("Part Number", "?").strip()
+        gb   = re.search(r'(\d+)\s*(GB|MB)', sz)
+        if gb: total_gb += int(gb.group(1)) * (1 if gb.group(2) == "GB" else 0.001)
+        row(short, f"{GR}{sz:<10}{RST} {DIM}{typ} @ {spd}    {mfr} {part}{RST}")
+    else:
+        row(short, f"{DIM}---{RST}")
+
+print(f"    {DIM}{pop}/{len(slots)} populated    {total_gb:.0f} GB"
+      + (f"    max {max_cap}" if max_cap else "") + f"{RST}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STORAGE
+# ═══════════════════════════════════════════════════════════════════════════════
+heading("STORAGE")
+
+lsblk = run("lsblk -d -b -o NAME,SIZE,MODEL,ROTA,TRAN,TYPE")
+for line in lsblk.splitlines()[1:]:
+    parts = line.split(None, 5)
+    if len(parts) < 4 or parts[-1] != "disk": continue
+    name = parts[0]
+    size = int(parts[1]) if parts[1].isdigit() else 0
+    rota_val = parts[-3] if len(parts) > 3 else "?"
+    tran_val = parts[-2] if len(parts) >= 5 else "?"
+    model_parts = parts[2:-3] if len(parts) > 5 else [parts[2]] if len(parts) > 4 else []
+    model = " ".join(model_parts).strip()
+    if model in ("0","1"): model = ""
+
+    kind = "SSD" if rota_val == "0" else "HDD" if rota_val == "1" else "?"
+    proto = "NVMe" if "nvme" in name else tran_val.upper() if tran_val not in ("?","0","1","disk") else ""
+    tstr = f"{kind}/{proto}" if proto else kind
+
+    row(f"/dev/{name}", f"{WH}{human(size):>8}{RST}  {tstr:<10}  {DIM}{model}{RST}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PCIe
+# ═══════════════════════════════════════════════════════════════════════════════
+heading("PCIe")
+
+pcie_dmi = run("sudo dmidecode -t slot 2>/dev/null") or run("dmidecode -t slot 2>/dev/null")
+pcie_slots = []
+cur = None
+for line in pcie_dmi.splitlines():
+    if line.strip() == "System Slot Information":
+        if cur: pcie_slots.append(cur)
+        cur = {}
+    elif cur is not None and ":" in line:
+        k, v = line.split(":", 1)
+        cur[k.strip()] = v.strip()
+if cur: pcie_slots.append(cur)
+
+# BDF -> device map
+bdf_map = {}
+for line in run("lspci 2>/dev/null").splitlines():
+    m = re.match(r'^([0-9a-f:.]+)\s+(.+)', line, re.I)
+    if m: bdf_map[m.group(1)] = m.group(2).strip()
+
+for s in pcie_slots:
+    desig  = s.get("Designation", "?")
+    stype  = s.get("Type", "?")
+    usage  = s.get("Current Usage", "?")
+    baddr  = s.get("Bus Address", "")
+
+    gen_m = re.search(r'Gen\s*(\d+)', stype, re.I)
+    if not gen_m: gen_m = re.search(r'PCIe\s+(\d+)', stype)
+    w_m = re.search(r'x(\d+)', stype)
+    gen = f"Gen{gen_m.group(1)}" if gen_m else ""
+    width = f"x{w_m.group(1)}" if w_m else ""
+    spec = f"{gen} {width}".strip() or stype.replace("PCI Express","PCIe")
+
+    in_use = usage.lower() == "in use"
+
+    device = ""
+    if in_use and baddr:
+        short = re.sub(r'^0000:', '', baddr)
+        device = bdf_map.get(short, "")
+        if not device:
+            for bdf, desc in bdf_map.items():
+                if baddr.endswith(bdf): device = desc; break
+        if not device:
+            r = run(f"lspci -s {baddr} 2>/dev/null")
+            if r and " " in r: device = r.split(" ", 1)[1]
+        for prefix in ("NVIDIA Corporation ","Intel Corporation ",
+                        "Advanced Micro Devices, Inc. ","Advanced Micro Devices, Inc. [AMD] ",
+                        "Advanced Micro Devices, Inc. [AMD/ATI] "):
+            device = device.replace(prefix, "")
+        if len(device) > 50: device = device[:49] + "…"
+
+    if in_use:
+        tag = f"{GR}■{RST}"
+        detail = f"{WH}{spec:<14}{RST}{device}"
+    else:
+        tag = f"{DIM}□{RST}"
+        detail = f"{DIM}{spec}{RST}"
+
+    short_d = desig[:16]
+    row(short_d, f"{tag}  {detail}", w=18)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GPU
+# ═══════════════════════════════════════════════════════════════════════════════
+nvsmi = run("nvidia-smi --query-gpu=name,memory.total,pci.bus_id,power.limit --format=csv,noheader,nounits 2>/dev/null")
+gpus_raw = run("lspci | grep -iE 'VGA|3D|Display'")
+
+if nvsmi or gpus_raw:
+    heading("GPU")
+    if nvsmi:
+        for line in nvsmi.splitlines():
+            p = [x.strip() for x in line.split(",")]
+            if len(p) >= 4:
+                print(f"    {GR}■{RST}  {WH}{p[0]}{RST}  {DIM}{p[1]} MB VRAM    TDP {p[3]}W    {p[2]}{RST}")
+    else:
+        for line in gpus_raw.splitlines():
+            desc = line.split(":", 2)[-1].strip() if ":" in line else line
+            print(f"    {GR}■{RST}  {WH}{desc}{RST}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# NIC (physical only)
+# ═══════════════════════════════════════════════════════════════════════════════
+heading("NIC")
+
+for iface in sorted(os.listdir("/sys/class/net")):
+    if iface == "lo": continue
+    if not os.path.exists(f"/sys/class/net/{iface}/device"): continue
+    uevent = run(f"cat /sys/class/net/{iface}/uevent")
+    if any(x in uevent for x in ("DEVTYPE=bridge","DEVTYPE=veth")): continue
+    if re.match(r'^(veth|br[-_]|docker|virbr|vnet|tap|tun|wg)', iface): continue
+
+    state  = run(f"cat /sys/class/net/{iface}/operstate") or "?"
+    speed  = run(f"cat /sys/class/net/{iface}/speed")
+    driver = run(f"basename $(readlink /sys/class/net/{iface}/device/driver)")
+    mac    = run(f"cat /sys/class/net/{iface}/address")
+
+    speed_s = f"{speed} Mbps" if speed and speed != "-1" else ""
+    sc = GR if state == "up" else DIM
+    tag = f"{sc}■{RST}" if state == "up" else f"{DIM}□{RST}"
+
+    parts = [x for x in (speed_s, driver, mac) if x]
+    row(iface, f"{tag}  {sc}{state:<8}{RST}{DIM}{'    '.join(parts)}{RST}", w=18)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+print(f"\n  {DIM}{'═' * W}{RST}\n")

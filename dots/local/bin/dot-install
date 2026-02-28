@@ -99,16 +99,12 @@ enable_systemd_units "$DOTS_DIR"
 # Package installation
 if [[ "$OSTYPE" == darwin* ]]; then
 
-    if ! command -v brew &>/dev/null; then
-        echo "Installing Homebrew..."
-        NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL \
-            https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    fi
     export HOMEBREW_NO_AUTO_UPDATE=1
     brew install vim tmux fzf pass nmap go ripgrep fd tree \
         htop ffmpeg git-delta syncthing
     brew install --head neovim
     brew install --cask vlc ghostty flux signal thunderbird
+
     # Key repeat: lower = faster. UI minimums are 15/2.
     defaults write -g InitialKeyRepeat -int 13
     defaults write -g KeyRepeat -int 1
