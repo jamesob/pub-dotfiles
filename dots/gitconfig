@@ -1,0 +1,62 @@
+[user]
+    name = James O'Beirne
+    email = james.obeirne@pm.me
+    signingkey = 0x7A935DADB2C44F05
+[core]
+    editor = vim
+    pager = delta
+[commit]
+    # Interferes with delving-bitcoin-archive
+    gpgsign = true
+[delta]
+    features = line-numbers decorations
+    # Don't set this here! It's inherited from BAT_THEME in zshrc.
+    # syntax-theme = 1337
+[interactive]
+    diffFilter = delta --color-only
+[delta "decorations"]
+    commit-decoration-style = bold yellow box ul
+    file-style = bold yellow ul
+    # file-decoration-style = none
+[alias]
+    unstage = reset HEAD
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr)%Creset' --abbrev-commit --date=relative --color
+    to = checkout
+    newb = checkout -b
+    mm = !git checkout master && git pull origin master && git checkout - && git merge master
+    co = checkout
+
+[push]
+    default = simple
+[diff]
+    colorMoved = dimmed_zebra
+[color]
+    ui = always
+
+[color "diff-highlight"]
+    oldNormal = red bold
+    oldHighlight = red bold 52
+    newNormal = green bold
+    newHighlight = green bold 22
+
+[color "diff"]
+    commit = green
+    meta = yellow
+    frag = cyan
+    old = red
+    new = green
+    whitespace = red reverse
+[gcrypt]
+    participants = 602FF17CFE7726E077AB497EC597111CC9A2855F
+[merge]
+	conflictStyle = diff3
+[safe]
+	directory = /bitcoin
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
+
+[url "ssh://git@git.j.co:222/"]
+    insteadOf = git@git.j.co:
