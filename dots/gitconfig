@@ -8,6 +8,7 @@
 [commit]
     # Interferes with delving-bitcoin-archive
     gpgsign = true
+    verbose = true
 [delta]
     features = line-numbers decorations
     # Don't set this here! It's inherited from BAT_THEME in zshrc.
