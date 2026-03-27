@@ -1,0 +1,6 @@
+[Unit]
+Description=Adjust monitor brightness based on time of day
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/mon-ctrl time

@@ -74,7 +74,7 @@ cmd_adjust_for_time() {
             echo "Stopping gammastep"
             systemctl --user stop gammastep || true
         else
-            brightness=1
+            brightness=30
             echo "Starting gammastep"
             systemctl --user start gammastep || true
         fi
@@ -83,7 +83,7 @@ cmd_adjust_for_time() {
         local hour
         hour=$(date +%H)
         if (( hour >= 20 || hour < 7 )); then
-            brightness=1
+            brightness=30
             echo "Starting gammastep"
             systemctl --user start gammastep || true
         else

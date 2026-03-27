@@ -101,12 +101,7 @@ enable_systemd_units() {
         if grep -q '^\[Install\]' "$unit"; then
             if ! systemctl --user is-enabled "$unit_name" &>/dev/null; then
                 echo "Enabling: $unit_name"
-                systemctl --user enable "$unit_name"
-            fi
-
-            # Start timers automatically
-            if [[ "$unit_name" == *.timer ]]; then
-                systemctl --user start "$unit_name"
+                systemctl --user enable --now "$unit_name"
             fi
         fi
     done

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run mon-ctrl time adjustment at 7pm and 8am
+
+[Timer]
+OnCalendar=*-*-* 19:00:00
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
