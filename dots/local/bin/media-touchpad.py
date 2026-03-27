@@ -280,6 +280,16 @@ class PlayerRow(QFrame):
         "  background-color: #434c5e;"
         "}"
     )
+    ROW_BTN_MUTED = (
+        "QPushButton {"
+        "  min-width: 0; min-height: 0; padding: 4px;"
+        "  font-size: 10pt; border-radius: 6px;"
+        "  background-color: #bf616a; color: #eceff4;"
+        "}"
+        "QPushButton:hover {"
+        "  background-color: #d08770;"
+        "}"
+    )
     ROW_SLIDER_STYLE = (
         "QSlider::groove:horizontal {"
         "  height: 6px; background: #4c566a;"
@@ -402,8 +412,8 @@ class PlayerRow(QFrame):
         )
         self.next_btn.clicked.connect(self.next_track)
 
-        self.mute_btn = QPushButton("🔊")
-        self.mute_btn.setFont(btn_font)
+        self.mute_btn = QPushButton("mute")
+        self.mute_btn.setFont(QFont("Sans", 10))
         self.mute_btn.setStyleSheet(self.ROW_BTN)
         self.mute_btn.setSizePolicy(
             QSizePolicy.Expanding, QSizePolicy.Expanding
@@ -631,7 +641,11 @@ class PlayerRow(QFrame):
 
         if pct is not None:
             self.mute_btn.setText(
-                "🔇" if muted else "🔊"
+                "unmute" if muted else "mute"
+            )
+            self.mute_btn.setStyleSheet(
+                self.ROW_BTN_MUTED if muted
+                else self.ROW_BTN
             )
             self._updating_slider = True
             self.vol_slider.setValue(pct)
@@ -677,8 +691,8 @@ class MediaController(QMainWindow):
         grid_layout = QGridLayout()
         grid_layout.setSpacing(8)
 
-        self.mute_button = QPushButton("🔊")
-        self.mute_button.setFont(QFont("Sans", 14))
+        self.mute_button = QPushButton("mute")
+        self.mute_button.setFont(QFont("Sans", 10))
         self.mute_button.clicked.connect(self.toggle_mute)
         self.mute_button.setSizePolicy(
             QSizePolicy.Expanding, QSizePolicy.Expanding
@@ -852,10 +866,23 @@ class MediaController(QMainWindow):
                 capture_output=True, text=True,
             )
             if result.returncode == 0:
-                if "yes" in result.stdout.lower():
-                    self.mute_button.setText("🔇")
-                else:
-                    self.mute_button.setText("🔊")
+                muted = "yes" in result.stdout.lower()
+                self.mute_button.setText(
+                    "unmute" if muted else "mute"
+                )
+                self.mute_button.setStyleSheet(
+                    "QPushButton {"
+                    "  background-color: #bf616a;"
+                    "  color: #eceff4;"
+                    "  border-radius: 8px;"
+                    "  padding: 10px;"
+                    "  font-size: 10pt;"
+                    "}"
+                    "QPushButton:hover {"
+                    "  background-color: #d08770;"
+                    "}"
+                    if muted else ""
+                )
         except Exception as e:
             print(f"Error updating mute button state: {e}")
 
