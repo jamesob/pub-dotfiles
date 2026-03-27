@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # System-level package installation and configuration.
-# Run once on a new machine; dot-install handles dotfile symlinks separately.
+# Run once on a new machine; install-dots handles dotfile symlinks separately.
 
 if [[ "$OSTYPE" == darwin* ]]; then
 

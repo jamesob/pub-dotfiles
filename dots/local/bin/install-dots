@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -z "${1:-}" ]; then 
-    echo "Usage: <dots-repo-location>"
-    exit 1
-fi
-
-SCRIPT_DIR="$(cd "$(realpath "$1")" && pwd)"
+SELF_DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+SCRIPT_DIR="$(cd "$(realpath "${1:-$(git -C "$SELF_DIR" rev-parse --show-toplevel)}")" && pwd)"
 DOTS_DIR="${DOTS_DIR:-$SCRIPT_DIR/dots}"
 HOSTS_DIR="${HOSTS_DIR:-$SCRIPT_DIR/hosts}"
 PLATFORMS_DIR="${PLATFORMS_DIR:-$SCRIPT_DIR/platforms}"

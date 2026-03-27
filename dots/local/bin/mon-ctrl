@@ -32,8 +32,17 @@ cmd_brightness() {
     local value="$2"
     local bus
     bus=$(get_bus "$monitor")
-    ddcutil --bus="$bus" setvcp "$VCP_BRIGHTNESS" "$value"
-    echo "Set $monitor brightness to $value"
+    local attempt
+    for attempt in 1 2 3; do
+        if ddcutil --bus="$bus" setvcp "$VCP_BRIGHTNESS" "$value" 2>&1; then
+            echo "Set $monitor brightness to $value"
+            return 0
+        fi
+        echo "Attempt $attempt failed for $monitor (bus $bus), retrying..." >&2
+        sleep 2
+    done
+    echo "WARNING: Failed to set $monitor brightness after 3 attempts" >&2
+    return 1
 }
 
 cmd_switch() {
@@ -95,9 +104,13 @@ cmd_adjust_for_time() {
     fi
     
     echo "Setting all monitors to brightness $brightness"
+    local failed=0
     for name in "${!MONITORS[@]}"; do
-        cmd_brightness "$name" "$brightness"
+        cmd_brightness "$name" "$brightness" || ((failed++))
     done
+    if ((failed > 0)); then
+        echo "WARNING: $failed monitor(s) failed to set brightness" >&2
+    fi
 }
 
 usage() {
