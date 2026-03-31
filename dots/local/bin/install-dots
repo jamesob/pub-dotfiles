@@ -103,8 +103,10 @@ enable_systemd_units() {
     done
 }
 
-enable_systemd_units "$DOTS_DIR"
-[[ -d "$PLATFORM_DIR" ]] && enable_systemd_units "$PLATFORM_DIR"
-[[ -d "$HOST_DIR" ]] && enable_systemd_units "$HOST_DIR"
+if [[ "$CURRENT_PLATFORM" == "linux" ]]; then
+    enable_systemd_units "$DOTS_DIR"
+    [[ -d "$PLATFORM_DIR" ]] && enable_systemd_units "$PLATFORM_DIR"
+    [[ -d "$HOST_DIR" ]] && enable_systemd_units "$HOST_DIR"
+fi
 echo
-echo "Done. Run 'jamesob-system-init' to install system packages."
+echo "Done. Run 'install-pkgs' to install system packages."

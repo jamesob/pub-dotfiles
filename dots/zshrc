@@ -122,7 +122,12 @@ source ~/.sh/all.sh
 unsetopt correct_all
 # setopt no_share_history
 
-autoload -U compinit && compinit
+autoload -U compinit
+if [[ -n ~/.zcompdump(#qN.mh+24) ]]; then
+    compinit
+else
+    compinit -C
+fi
 
 zstyle ':completion:*' menu select
 
@@ -133,7 +138,7 @@ fi
 
 export FZF_DEFAULT_COMMAND="rg --files --follow --no-ignore-vcs --hidden -g '!.git/' -g '!.pytest_cache/' -g '!**/.*.egg-info/' -g '!*.pyc' -g '!node_modules/' -g '!__pycache__/' -g '!.mypy_cache/' -g '!.cache/' -g '!venv/'"
 
-[ ! -z "$DESK_ENV" ] && source "$DESK_ENV"
+[[ -n "$DESK_ENV" ]] && source "$DESK_ENV"
 
 export PYTHONSTARTUP="${HOME}/.config/python/startup.py"
 
@@ -145,7 +150,7 @@ export PATH=${HOME}/.local/bin:${PATH}
 # Have zsh report time
 # REPORTTIME=3
 
-if `which ruby >/dev/null`; then
+if command -v ruby >/dev/null; then
   export GEM_HOME="$HOME/.local/gems"
   export PATH="$HOME/.local/gems/bin:$PATH"
 fi
@@ -158,8 +163,17 @@ if [ -d "/usr/local/go/bin" ]; then
   export PATH="${PATH}:/usr/local/go/bin"
 fi
 
-export GDK_BACKEND=wayland
-export QT_QPA_PLATFORM=wayland
+if [ -d "${HOME}/go/bin" ]; then
+  export PATH="${PATH}:${HOME}/go/bin"
+fi
+
+HAS_SWAY=false
+command -v sway >/dev/null && HAS_SWAY=true
+
+if $HAS_SWAY; then
+    export GDK_BACKEND=wayland
+    export QT_QPA_PLATFORM=wayland
+fi
 
 export SWAYSOCK=/run/user/$(id -u)/sway-ipc.$(id -u)..sock
 
@@ -171,12 +185,14 @@ export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib
 
 export EDITOR=vim
 
-if [ "$(tty)" = "/dev/tty1" ] && which sway >/dev/null; then
+if [ "$(tty)" = "/dev/tty1" ] && $HAS_SWAY; then
     export SDL_VIDEODRIVER=wayland
     export _JAVA_AWT_WM_NONREPARENTING=1
     export QT_QPA_PLATFORM=wayland
     export XDG_CURRENT_DESKTOP=sway
     export XDG_SESSION_DESKTOP=sway
+    export GDK_BACKEND=wayland
+    export QT_QPA_PLATFORM=wayland
     sway
 fi
 
@@ -217,14 +233,19 @@ export PYTHONPATH=${HOME}/.ipython/extensions:${PYTHONPATH}
 # export SSH_AUTH_SOCK=~/.ssh/ssh_auth_sock
 # ssh-add -l > /dev/null || ssh-add
 
-export GPG_TTY="$(tty)"
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    export SSH_AUTH_SOCK=$(gpgconf --list-dirs agent-ssh-socket)
-else
-    export SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-$(gpgconf --list-dirs agent-ssh-socket)}
-fi
-gpgconf --launch gpg-agent
-gpg-connect-agent updatestartuptty /bye > /dev/null
+_init_gpg_agent() {
+    export GPG_TTY="$(tty)"
+    if [[ "$OSTYPE" == darwin* ]]; then
+        export SSH_AUTH_SOCK=$(gpgconf --list-dirs agent-ssh-socket)
+    else
+        export SSH_AUTH_SOCK=${SSH_AUTH_SOCK:-$(gpgconf --list-dirs agent-ssh-socket)}
+    fi
+    gpgconf --launch gpg-agent
+    gpg-connect-agent updatestartuptty /bye > /dev/null
+    add-zsh-hook -d precmd _init_gpg_agent
+}
+autoload -U add-zsh-hook
+add-zsh-hook precmd _init_gpg_agent
 
 if [ -f ~/.zsh/machine-specific.sh ]; then
     . ~/.zsh/machine-specific.sh

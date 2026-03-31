@@ -4,6 +4,7 @@ local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
 vim.lsp.config('clangd', {
     capabilities = capabilities,
+    filetypes = { 'c', 'cpp', 'objc', 'objcpp', 'cuda', 'proto' },
     cmd = {
       -- see clangd --help-hidden
       "clangd",
@@ -48,7 +49,23 @@ vim.lsp.enable('clangd')
 -- })
 -- vim.lsp.enable('pylsp')
 
-vim.lsp.config('gopls', {})
+vim.lsp.config('gopls', {
+  capabilities = capabilities,
+  filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
+  flags = {
+    debounce_text_changes = LSP_DEBOUNCE,
+  },
+  settings = {
+    gopls = {
+      analyses = {
+        unusedparams = true,
+        shadow = true,
+      },
+      staticcheck = true,
+      gofumpt = true,
+    },
+  },
+})
 vim.lsp.enable('gopls')
 
 vim.lsp.config('ty', {})

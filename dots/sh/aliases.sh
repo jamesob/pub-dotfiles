@@ -280,7 +280,7 @@ count_locks_to_file() {
   cat locks.txt | sort -un
 }
 
-alias nvim='c nvim'
+# [[ "$OSTYPE" = linux* ]] && command -v c >/dev/null && alias nvim='c nvim'
 
 vi-aliases() {
   vim ~/.sh/aliases.sh
