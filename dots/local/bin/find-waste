@@ -75,8 +75,9 @@ human_size() {
 }
 
 dir_size_bytes() {
+    # du -sk is POSIX-portable (GNU and BSD/macOS); -b is GNU-only.
     local result
-    result=$(du -sb "$1" 2>/dev/null | awk '{print $1}')
+    result=$(du -sk "$1" 2>/dev/null | awk '{print $1 * 1024}')
     echo "${result:-0}"
 }
 
@@ -87,8 +88,11 @@ dir_size_mb() {
 }
 
 file_size_bytes() {
+    # GNU stat uses -c %s; BSD/macOS stat uses -f %z. Try GNU first: on BSD it
+    # errors out with an empty result, and GNU lacks -f %z, so order matters.
     local result
-    result=$(stat -c%s "$1" 2>/dev/null || echo 0)
+    result=$(stat -c %s "$1" 2>/dev/null)
+    [[ "$result" =~ ^[0-9]+$ ]] || result=$(stat -f %z "$1" 2>/dev/null)
     echo "${result:-0}"
 }
 
