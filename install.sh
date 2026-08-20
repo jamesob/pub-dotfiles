@@ -1,23 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SELF_DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
-SCRIPT_DIR="$(cd "$(realpath "${1:-$(git -C "$SELF_DIR" rev-parse --show-toplevel)}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DOTS_DIR="${DOTS_DIR:-$SCRIPT_DIR/dots}"
 HOSTS_DIR="${HOSTS_DIR:-$SCRIPT_DIR/hosts}"
-PLATFORMS_DIR="${PLATFORMS_DIR:-$SCRIPT_DIR/platforms}"
 TARGET_DIR="${TARGET_DIR:-$HOME}"
 CURRENT_HOST="$(hostname)"
-
-if [[ "$OSTYPE" == darwin* ]]; then
-    CURRENT_PLATFORM="macos"
-else
-    CURRENT_PLATFORM="linux"
-fi
 
 if [[ ! -d "$DOTS_DIR" ]]; then
     echo "Error: dots directory not found: $DOTS_DIR" >&2
     exit 1
+fi
+
+if ! command -v fzf &>/dev/null; then
+    echo "Installing fzf..."
+    if [[ "$OSTYPE" == darwin* ]]; then
+        brew install fzf
+    elif command -v pacman &>/dev/null; then
+        sudo pacman -S --noconfirm fzf
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get update && sudo apt-get install -y fzf
+    else
+        echo "Unknown OS, install fzf manually" >&2
+        exit 1
+    fi
 fi
 
 laank() {
@@ -53,16 +59,7 @@ find "$DOTS_DIR" -type f | while read -r src; do
     laank "$src" "$DOTS_DIR"
 done
 
-# Process platform-specific dotfiles
-PLATFORM_DIR="$PLATFORMS_DIR/$CURRENT_PLATFORM"
-if [[ -d "$PLATFORM_DIR" ]]; then
-    echo "Processing platform-specific files for: $CURRENT_PLATFORM"
-    find "$PLATFORM_DIR" -type f -not -name '.gitkeep' | while read -r src; do
-        laank "$src" "$PLATFORM_DIR"
-    done
-fi
-
-# Process host-specific dotfiles (overrides platform)
+# Process host-specific dotfiles
 HOST_DIR="$HOSTS_DIR/$CURRENT_HOST"
 if [[ -d "$HOST_DIR" ]]; then
     echo "Processing host-specific files for: $CURRENT_HOST"
@@ -73,9 +70,6 @@ fi
 
 # Mark all local/bin files as executable
 find "$DOTS_DIR" -path "*/local/bin/*" -type f -exec chmod +x {} \;
-if [[ -d "$PLATFORM_DIR" ]]; then
-    find "$PLATFORM_DIR" -path "*/local/bin/*" -type f -exec chmod +x {} \;
-fi
 if [[ -d "$HOST_DIR" ]]; then
     find "$HOST_DIR" -path "*/local/bin/*" -type f -exec chmod +x {} \;
 fi
@@ -97,17 +91,16 @@ enable_systemd_units() {
         if grep -q '^\[Install\]' "$unit"; then
             if ! systemctl --user is-enabled "$unit_name" &>/dev/null; then
                 echo "Enabling: $unit_name"
-                systemctl --user enable --now "$unit_name"
+                systemctl --user enable "$unit_name"
+            fi
+
+            # Start timers automatically
+            if [[ "$unit_name" == *.timer ]]; then
+                systemctl --user start "$unit_name"
             fi
         fi
     done
 }
 
-if [[ "$CURRENT_PLATFORM" == "linux" ]]; then
-    enable_systemd_units "$DOTS_DIR"
-    [[ -d "$PLATFORM_DIR" ]] && enable_systemd_units "$PLATFORM_DIR"
-    [[ -d "$HOST_DIR" ]] && enable_systemd_units "$HOST_DIR"
-    go build -o ~/.local/bin/yubikey-touch-detector ${SCRIPT_DIR}/bin/yubikey-touch-detector.go
-fi
-echo
-echo "Done. Run 'install-pkgs' to install system packages."
+enable_systemd_units "$DOTS_DIR"
+[[ -d "$HOST_DIR" ]] && enable_systemd_units "$HOST_DIR"

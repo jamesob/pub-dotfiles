@@ -5,6 +5,10 @@ set noswapfile
 " Allow the cursor to move over everything, not just filled space.
 set virtualedit=all
 
+" Auto-insert comment leader when hitting Enter in a comment, and
+" continue the leader on auto-wrapped comment lines.
+set formatoptions+=rc
+
 " Leader
 let mapleader=","
 

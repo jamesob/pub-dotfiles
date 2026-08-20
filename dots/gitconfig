@@ -6,7 +6,6 @@
     editor = vim
     pager = delta
 [commit]
-    # Interferes with delving-bitcoin-archive
     gpgsign = true
     verbose = true
 [delta]
@@ -26,20 +25,26 @@
     newb = checkout -b
     mm = !git checkout master && git pull origin master && git checkout - && git merge master
     co = checkout
-
 [push]
     default = simple
+    autoSetupRemote = true
+[pull]
+    rebase = true
+[branch]
+	sort = -committerdate    # Sort branches by most recent commit first
+[tag]
+	sort = -version:refname  # Sort version numbers as you would expect
 [diff]
+    algorithm = histogram
     colorMoved = dimmed_zebra
+    mnemonicPrefix = true
 [color]
     ui = always
-
 [color "diff-highlight"]
     oldNormal = red bold
     oldHighlight = red bold 52
     newNormal = green bold
     newHighlight = green bold 22
-
 [color "diff"]
     commit = green
     meta = yellow
@@ -58,6 +63,10 @@
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
-
+[rerere]
+    enabled = true        # Record and reuse conflict resolutions
+    autoupdate = true     # Apply stored conflict resolutions automatically
 [url "ssh://git@git.j.co:222/"]
     insteadOf = git@git.j.co:
+[credential]
+	helper = store

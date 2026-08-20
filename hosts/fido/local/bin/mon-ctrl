@@ -3,9 +3,9 @@ set -euo pipefail
 
 # Monitor name to bus mapping
 declare -A MONITORS=(
-    ["touch"]="2"
-    ["main"]="3"
-    ["sec"]="4"
+    ["z3"]="2"
+    ["s27"]="3"
+    ["p27"]="4"
 )
 
 # VCP codes
@@ -32,35 +32,13 @@ cmd_brightness() {
     local value="$2"
     local bus
     bus=$(get_bus "$monitor")
-    local attempt
-    for attempt in 1 2 3; do
-        if ddcutil --bus="$bus" setvcp "$VCP_BRIGHTNESS" "$value" 2>&1; then
-            echo "Set $monitor brightness to $value"
-            return 0
-        fi
-        echo "Attempt $attempt failed for $monitor (bus $bus), retrying..." >&2
-        sleep 2
-    done
-    echo "WARNING: Failed to set $monitor brightness after 3 attempts" >&2
-    return 1
-}
-
-cmd_brightness_all() {
-    local value="$1"
-    local name failed=0
-    echo "Setting all monitors to brightness $value"
-    for name in "${!MONITORS[@]}"; do
-        cmd_brightness "$name" "$value" || failed=$((failed + 1))
-    done
-    if ((failed > 0)); then
-        echo "WARNING: $failed monitor(s) failed to set brightness" >&2
-        return 1
-    fi
+    ddcutil --bus="$bus" setvcp "$VCP_BRIGHTNESS" "$value"
+    echo "Set $monitor brightness to $value"
 }
 
 cmd_switch() {
     local bus
-    bus=$(get_bus "main")
+    bus=$(get_bus "s27")
     
     # Get current input
     local current
@@ -68,10 +46,10 @@ cmd_switch() {
     
     if [[ "$current" == "11" ]]; then
         ddcutil --bus="$bus" setvcp "$VCP_INPUT_SOURCE" "$INPUT_HDMI2"
-        echo "Switched main to HDMI2"
+        echo "Switched S27 to HDMI2"
     else
         ddcutil --bus="$bus" setvcp "$VCP_INPUT_SOURCE" "$INPUT_HDMI1"
-        echo "Switched main to HDMI1"
+        echo "Switched S27 to HDMI1"
     fi
 }
 
@@ -86,44 +64,31 @@ cmd_show() {
 
 cmd_adjust_for_time() {
     local brightness
-    local isday
     
     if command -v gammastep &>/dev/null && pgrep -x gammastep &>/dev/null; then
         local period
-        period=$(gammastep -p 2>&1 | grep -oP 'Period:\s*\K\w+' || echo 'unknown')
+        period=$(gammastep -p 2>/dev/null | grep -oP 'Period:\s*\K\w+' || echo "unknown")
         if [[ "$period" == "Daytime" ]]; then
-            brightness=100
-            echo "Stopping gammastep"
-            systemctl --user stop gammastep || true
+            brightness=80
         else
-            brightness=30
-            echo "Starting gammastep"
-            systemctl --user start gammastep || true
+            brightness=1
         fi
         echo "Gammastep period: $period"
     else
         local hour
         hour=$(date +%H)
         if (( hour >= 20 || hour < 7 )); then
-            brightness=30
-            echo "Starting gammastep"
-            systemctl --user start gammastep || true
+            brightness=1
         else
-            brightness=100
-            echo "Stopping gammastep"
-            systemctl --user stop gammastep || true
+            brightness=80
         fi
         echo "Time-based (hour $hour)"
     fi
     
     echo "Setting all monitors to brightness $brightness"
-    local failed=0
     for name in "${!MONITORS[@]}"; do
-        cmd_brightness "$name" "$brightness" || ((failed++))
+        cmd_brightness "$name" "$brightness"
     done
-    if ((failed > 0)); then
-        echo "WARNING: $failed monitor(s) failed to set brightness" >&2
-    fi
 }
 
 usage() {
@@ -132,25 +97,18 @@ Usage: mon-ctl <command> [args]
 
 Commands:
     brightness <monitor> <0-100>  Set monitor brightness
-    brightness <0-100>            Set brightness on all monitors
-    switch                        Toggle main between HDMI1/HDMI2
+    switch                        Toggle S27 between HDMI1/HDMI2
     show                          Display all monitors
-    time                          Auto-adjust brightness based on time/gammastep
+    adjust-for-time               Auto-adjust brightness based on time/gammastep
 
 Monitors: ${!MONITORS[*]}
 EOF
 }
 
 case "${1:-}" in
-    b|brightness)
-        if [[ $# -eq 2 && "$2" =~ ^[0-9]+$ ]]; then
-            cmd_brightness_all "$2"
-        elif [[ $# -ge 3 ]]; then
-            cmd_brightness "$2" "$3"
-        else
-            usage
-            exit 1
-        fi
+    brightness)
+        [[ $# -lt 3 ]] && { usage; exit 1; }
+        cmd_brightness "$2" "$3"
         ;;
     switch)
         cmd_switch
@@ -158,7 +116,7 @@ case "${1:-}" in
     show)
         cmd_show
         ;;
-    time)
+    adjust-for-time)
         cmd_adjust_for_time
         ;;
     *)

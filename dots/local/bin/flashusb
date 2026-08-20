@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() { echo "error: $*" >&2; exit 1; }
+
+command -v fzf >/dev/null || die "fzf not found — brew install fzf / apt install fzf"
+
+OS="$(uname -s)"
+
+# --- Pick the image ---
+echo "Select an image to flash:"
+IMAGE=$(find . ~/Downloads -maxdepth 2 -type f \( -iname '*.iso' -o -iname '*.img' \) 2>/dev/null | sort -u | fzf --prompt="Image> " --height=15) || die "No image selected"
+echo "-> $IMAGE"
+
+# --- Pick the disk ---
+echo ""
+echo "Select target disk:"
+
+if [[ "$OS" == "Darwin" ]]; then
+  DISK=$(diskutil list external physical 2>/dev/null \
+    | grep '^/dev/' \
+    | while read -r d; do
+        size=$(diskutil info "$d" 2>/dev/null | awk -F: '/Disk Size/{gsub(/^ +/,"",$2); print $2; exit}')
+        name=$(diskutil info "$d" 2>/dev/null | awk -F: '/Media Name/{gsub(/^ +/,"",$2); print $2; exit}')
+        echo "$d  $size  $name"
+      done \
+    | fzf --prompt="Disk> " --height=10 \
+    | awk '{print $1}') || die "No disk selected"
+else
+  DISK=$(lsblk -dpno NAME,SIZE,MODEL,TRAN 2>/dev/null \
+    | grep -E 'usb' \
+    | fzf --prompt="Disk> " --height=10 \
+    | awk '{print $1}') || die "No disk selected"
+fi
+
+[[ -z "$DISK" ]] && die "No disk selected"
+echo "-> $DISK"
+
+# --- Sanity checks ---
+echo ""
+if [[ "$OS" == "Darwin" ]]; then
+  diskutil info "$DISK" | grep -E 'Device|Media Name|Disk Size|Removable'
+else
+  lsblk "$DISK"
+fi
+
+echo ""
+read -rp "WARNING: ALL DATA ON $DISK WILL BE DESTROYED. Type YES to continue: " confirm
+[[ "$confirm" == "YES" ]] || die "Aborted"
+
+# --- Flash it ---
+echo ""
+RAWDISK="$DISK"
+if [[ "$OS" == "Darwin" ]]; then
+  RAWDISK="${DISK/disk/rdisk}"
+  echo "Unmounting $DISK..."
+  set -x
+  diskutil unmountDisk force "$DISK"
+  set +x
+fi
+
+echo "Writing $(basename "$IMAGE") -> $RAWDISK ..."
+set -x
+sudo dd if="$IMAGE" of="$RAWDISK" bs=4M status=progress conv=fsync
+set +x
+
+if [[ "$OS" == "Darwin" ]]; then
+  echo "Ejecting $DISK..."
+  set -x
+  diskutil eject "$DISK" 2>/dev/null || true
+  set +x
+fi
+
+echo ""
+echo "Done. Safe to remove."

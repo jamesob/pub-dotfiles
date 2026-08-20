@@ -2,6 +2,7 @@
 setopt INC_APPEND_HISTORY
 # Reloads the history whenever you use it
 setopt EXTENDED_HISTORY
+setopt interactive_comments
 
 HISTSIZE=100000
 SAVEHIST=100000
@@ -250,3 +251,6 @@ add-zsh-hook precmd _init_gpg_agent
 if [ -f ~/.zsh/machine-specific.sh ]; then
     . ~/.zsh/machine-specific.sh
 fi
+
+# opencode
+export PATH=/home/james/.opencode/bin:$PATH

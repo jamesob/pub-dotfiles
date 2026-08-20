@@ -18,10 +18,6 @@ if not vim.loop.fs_stat(lazypath) then
 end
 vim.opt.rtp:prepend(lazypath)
 
-local synlangs = {
-  "c", "cpp", "lua", "vim", "vimdoc", "query", "markdown", "python"
-}
-
 require("lazy").setup({
   { 'hrsh7th/nvim-cmp', },
   { 'hrsh7th/cmp-buffer', },
@@ -54,11 +50,6 @@ require("lazy").setup({
   },
   { 'junegunn/seoul256.vim' },
 
-  -- Treesitter
-  {
-    'nvim-treesitter/nvim-treesitter',
-    build = ':TSUpdate',
-  },
   { 'folke/which-key.nvim' },
 
   { "tpope/vim-fugitive" },

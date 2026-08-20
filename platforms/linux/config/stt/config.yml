@@ -1,9 +1,9 @@
 hotkey: alt_l
 audio_device: pipewire
+sound_enabled: false
 backends:
   default:
     provider: openai
     openai_base_url: http://stt.j.co:8201
-    openai_whisper_model: openai/whisper-large-v3
 order:
 - default
