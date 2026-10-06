@@ -7,8 +7,6 @@ alias tmuxgo='tmux attach-session -t'
 alias tmuxnew='tmux new-session -s'
 alias tsw='tmux split-window'
 
-alias open='xdg-open'
-
 tmux-change-prefix() {
   tmux set -g prefix C-b
 }
