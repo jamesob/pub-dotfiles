@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Monitor name to bus mapping
 declare -A MONITORS=(
-    ["touch"]="2"
+    # ["touch"]="2"
     ["main"]="3"
     ["sec"]="4"
 )
