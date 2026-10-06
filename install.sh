@@ -26,6 +26,15 @@ if ! command -v fzf &>/dev/null; then
     fi
 fi
 
+# fzf < 0.73.1 is affected by CVE-2026-53432/CVE-2026-53433 (crash/DoS via
+# crafted input); OS packages often lag. Warn but don't block.
+if command -v fzf &>/dev/null; then
+    fzf_ver="$(fzf --version | cut -d' ' -f1)"
+    if [[ "$(printf '%s\n0.73.1\n' "$fzf_ver" | sort -V | head -1)" != "0.73.1" ]]; then
+        echo "Warning: fzf $fzf_ver is older than 0.73.1 (CVE-2026-53432, CVE-2026-53433); consider installing a newer binary" >&2
+    fi
+fi
+
 laank() {
     local src=$1
     local base_dir=$2
