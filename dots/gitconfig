@@ -1,7 +1,7 @@
 [user]
     name = James O'Beirne
     email = james.obeirne@pm.me
-    signingkey = 0x7A935DADB2C44F05
+	signingkey = key::ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCmeICfkjaqycfVlUS5cg1tZk0p6KIFAQdm5EVlhPSq1PluwTWQkkMzPHfVOcboxXXxKB/8ZDLmCzFu8iG6tlLlMiPqXtePb2o3u5sHjK0SoJCj3v2XVSb5NN7HJ5D574E3MfM0n8bNgLHqFk+IRNKE351tnA/KbW3IoviQz7N7JwMuPe0uz5aFU+ZyL1IDaCC/HCslXu5N8IdXIiM47Jf1tzgPVZzyZJ8bokYuKJ/tmuLl5odfWLGxIAqetLrUmj8R222DsRdAehwADTxWcgh2xuPGyBvpw8UaZg5tNYIMeYWglYRVsuIqrTycDokeWz9fPsdmBrg8mCaTSdUlRTMvqRPuIDItTq633GHNAZ17Tn7iTP8SM4JDCwKpfAOiG46fzYHasjNnjHjEKqylwcUdjbjot+lwrPIaX9Cq7vA0zRF2b4F329Tm+sXwqYWlLkGftZcXfHS1E8uUWZFljV6/CxDctmtbFZXkqEwhZ/sAq8UX6c7vtnKlvkL2O8s2n9mFP0XDDONeDEzc2Xz++/w8sG+Tv8Vkm68ULSqOE1uvcNn5ktx/bO5mKaOXwSS/9djvcsaAtpdAK2jY4BDRYnmF/zBpRJWSAH4iMxlBeYelZcIpRTZu1BPUlo2qAzy5alBCYARWts753ZCzftmFPwGM418OXZD0Yu4DaA/efyGU6Q== cardno:7826579
 [core]
     editor = vim
     pager = delta
@@ -70,3 +70,5 @@
     insteadOf = git@git.j.co:
 [credential]
 	helper = store
+[gpg]
+	format = ssh
