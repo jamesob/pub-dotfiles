@@ -1,3 +1,4 @@
+" local derivative, not an upstream artifact (no pin applies):
 " copied from gruvbox, just replaced the colors
 " https://github.com/morhetz/gruvbox
 "

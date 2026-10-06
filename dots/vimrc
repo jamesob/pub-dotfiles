@@ -139,6 +139,9 @@ set statusline=%t%h%m%r%y%=%c,%l/%L\ %P
 "
 " tmux vim plugin
 " ------------------------
+" vendored (modified): derived from christoomey/vim-tmux-navigator
+" @ afb45a55b452b9238159047ce7c6e161bd4a9907 (2022-08-24), pre-<C-U> map era;
+" inlined here with the loaded-guard set so the plugin never double-loads.
 "
 
 let g:loaded_tmux_navigator = 1

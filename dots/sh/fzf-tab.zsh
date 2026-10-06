@@ -1,3 +1,6 @@
+# vendored (modified): junegunn/fzf @ b1be3a8 shell/key-bindings.zsh + completion.zsh
+# concatenated,
+# plus this header; local changes to __fzf_select/cd handling marked below.
 ### key-bindings.zsh ###
 #     ____      ____
 #    / __/___  / __/

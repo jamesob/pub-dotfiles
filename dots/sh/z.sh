@@ -1,3 +1,4 @@
+# vendored: https://github.com/rupa/z @ 054cf43fbe101ab9870a146ebe61f1dbaf6fe56c (content otherwise unchanged; drop this header line to compare hashes)
 # Copyright (c) 2009 rupa deadwyler under the WTFPL license
 
 # maintains a jump-list of the directories you actually use

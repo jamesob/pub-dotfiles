@@ -1,3 +1,5 @@
+" vendored copy; upstream: http://kippura.org/zenburnpage/ (no pinned upstream
+" git commit; not byte-identical to the vim-scripts/zenburn mirror) GPL.
 " Vim color file
 " Maintainer:   Jani Nurminen <slinky@iki.fi>
 " URL:          http://kippura.org/zenburnpage/

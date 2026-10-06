@@ -1,3 +1,4 @@
+" vendored: https://github.com/junegunn/seoul256.vim @ 24ed467ca6ef9ce7ede56c9ffb1c6b30cd0ee906 (content otherwise unchanged; drop this header line to compare hashes)
 " "  _____             _ ___ ___ ___      "
 " " |   __|___ ___ _ _| |_  |  _|  _|     "
 " " |__   | -_| . | | | |  _|_  | . |     "

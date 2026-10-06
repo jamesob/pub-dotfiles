@@ -1,3 +1,6 @@
+# vendored (modified, provenance unclear): pre-0.48 junegunn/fzf key-bindings,
+# locally tweaked; no byte-identical upstream commit found in fzf history.
+# Superseded by fzf-tab.zsh, which is sourced right after this in zshrc.
 #     ____      ____
 #    / __/___  / __/
 #   / /_/_  / / /_
