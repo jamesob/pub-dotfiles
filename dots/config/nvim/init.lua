@@ -5,6 +5,9 @@ vim.cmd('source ~/.vim/common.vim')
 vim.g.ackprg = 'rg --vimgrep --smart-case'
 
 -- Bootstrap lazy.nvim
+-- Pinned to the lazy.nvim commit recorded in lazy-lock.json (committed to
+-- this repo); plugin set is pinned by the lockfile imported from this dir.
+local lazy_commit = "85c7ff3711b730b4030d03144f6db6375044ae82"
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not vim.loop.fs_stat(lazypath) then
   vim.fn.system({
@@ -12,9 +15,9 @@ if not vim.loop.fs_stat(lazypath) then
     "clone",
     "--filter=blob:none",
     "https://github.com/folke/lazy.nvim.git",
-    "--branch=stable",
     lazypath,
   })
+  vim.fn.system({ "git", "-C", lazypath, "checkout", "--quiet", lazy_commit })
 end
 vim.opt.rtp:prepend(lazypath)
 
@@ -63,6 +66,8 @@ require("lazy").setup({
   { 'NMAC427/guess-indent.nvim' },
   { 'preservim/nerdtree' },
   { 'mileszs/ack.vim' },
+}, {
+  lockfile = vim.fn.stdpath("config") .. "/lazy-lock.json",
 })
 
 vim.cmd [[colorscheme seoul256]]
