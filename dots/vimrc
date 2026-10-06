@@ -16,6 +16,14 @@ source ~/.vim/common.vim
 let &t_SI = "\e[6 q"
 let &t_EI = "\e[2 q"
 
+" Refuse vim's startup terminal queries: when replies (cursor position,
+" terminal id, OSC 10/11 fg/bg) come back late through tmux+ssh they land
+" in the buffer as typed junk. background is set explicitly below.
+set t_RV=
+set t_u7=
+set t_RF=
+set t_RB=
+
 " reset the cursor on start (for older versions of vim, usually not required)
 augroup myCmds
 au!
