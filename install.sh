@@ -35,6 +35,9 @@ if command -v fzf &>/dev/null; then
     fi
 fi
 
+# Create vim scratch dirs referenced by ~/.vimrc (backupdir/directory/undodir)
+mkdir -p "$TARGET_DIR/.vim/backup" "$TARGET_DIR/.vim/swp" "$TARGET_DIR/.vim/undo"
+
 laank() {
     local src=$1
     local base_dir=$2
